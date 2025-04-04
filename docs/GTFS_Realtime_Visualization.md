@@ -10,7 +10,45 @@ GTFS Real-time is a feed specification that allows public transportation agencie
 - **Service alerts** - station/stop closures, important notifications
 - **Vehicle positions** - where vehicles are located in real-time
 
-## Visualizing GTFS Real-time Data
+## Using the NMBS Data Package for Visualization
+
+The `nmbs_data` package provides several tools for working with GTFS real-time data:
+
+### Programmatic Usage
+
+```python
+# Import the visualization module
+from nmbs_data.visualization.map_visualization import visualize_train_routes
+
+# Generate a map with dark mode enabled (default)
+map_path = visualize_train_routes(dark_mode=True)
+print(f"Map saved to: {map_path}")
+
+# Or with light mode
+map_path = visualize_train_routes(dark_mode=False)
+```
+
+### Command-line Usage
+
+```bash
+# Generate a visualization directly from the command line
+python main.py visualize
+
+# Use light mode instead of dark mode
+python main.py visualize --light
+```
+
+### Web Application
+
+You can also use the integrated web application to visualize the data:
+
+```bash
+python main.py webapp
+```
+
+Then navigate to the Maps tab in the application.
+
+## Visualizing GTFS Real-time Data (External Tools)
 
 ### Option 1: Using Existing Tools
 
@@ -95,6 +133,16 @@ When implementing a visualizer:
 2. Overlay real-time updates to show actual train positions, delays, and platform changes
 3. Poll for new data every 30 seconds to keep information current
 4. Consider implementing a caching mechanism to reduce load on the NMBS/SNCB API
+
+## Project-Specific Implementation
+
+In the NMBS Train Data project:
+
+- `nmbs_data.data.gtfs_realtime_reader` provides functions for parsing GTFS-RT data
+- `nmbs_data.visualization.map_visualization` creates interactive maps using Folium
+- Vehicle positions are displayed with directional markers
+- Platform changes are highlighted in red
+- The map includes layer controls to toggle different route types and real-time data
 
 ## Useful Resources
 

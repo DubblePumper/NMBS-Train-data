@@ -6,7 +6,13 @@ import pandas as pd
 import json
 import os
 import ast
-from train_data_overview import TrainDataAnalyzer
+import time
+import shutil
+from pathlib import Path
+
+# Update imports to use the new package structure
+from nmbs_data.analysis.train_data_overview import TrainDataAnalyzer
+from nmbs_data.visualization.map_visualization import visualize_train_routes
 
 # Set dark mode theme colors
 dark_bg_color = "#121212"
@@ -36,14 +42,20 @@ dark_template = go.layout.Template(
 )
 
 # Load overview data
-try:
-    with open('train_data_overview.json', 'r') as f:
-        overview_data = json.load(f)
-except FileNotFoundError:
-    # Generate new overview if file doesn't exist
-    analyzer = TrainDataAnalyzer()
-    overview_data = analyzer.generate_overview()
-    analyzer.save_overview(overview_data)
+def get_overview_data():
+    try:
+        overview_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'train_data_overview.json')
+        with open(overview_path, 'r') as f:
+            overview_data = json.load(f)
+    except FileNotFoundError:
+        # Generate new overview if file doesn't exist
+        analyzer = TrainDataAnalyzer()
+        overview_data = analyzer.generate_overview()
+        analyzer.save_overview(overview_data)
+    return overview_data
+
+# Initialize overview data
+overview_data = get_overview_data()
 
 # Helper function to parse string representations of dictionaries
 def parse_string_dict(string_dict):
@@ -548,11 +560,9 @@ def generate_route_map(n_clicks):
         return "", "", {"display": "none"}
     
     try:
-        # Fix import by using direct import from the app directory
-        from map_visualization import visualize_train_routes
+        # Use the visualize_train_routes function from the visualization module
         
         # Generate a unique filename based on timestamp
-        import time
         map_filename = f"train_routes_{int(time.time())}.html"
         
         # Generate the map with dark mode
@@ -562,11 +572,12 @@ def generate_route_map(n_clicks):
         map_url = f"/assets/{map_filename}"
         
         # Copy the map file to the assets directory for Dash to serve it
-        import shutil
-        from pathlib import Path
         assets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
         Path(assets_dir).mkdir(exist_ok=True)
-        shutil.copy2(map_path, os.path.join(assets_dir, map_filename))
+        try:
+            shutil.copy2(map_path, os.path.join(assets_dir, map_filename))
+        except Exception as copy_error:
+            return "", html.P(f"Error copying map file: {str(copy_error)}", style={"color": "red"}), {"display": "none"}
         
         return map_url, html.P("Map generated successfully!", style={"color": "green"}), {"display": "block"}
     except Exception as e:

@@ -1,37 +1,90 @@
 # NMBS Train Data Analysis
 
-This project analyzes both planning data and real-time data from NMBS (Belgian Railways).
+A package for analyzing, visualizing, and exploring NMBS (Belgian Railways) train data, including schedule information and real-time updates.
 
-## Overview
+## Project Structure
 
-The application processes four types of planning data:
-- GTFS (General Transit Feed Specification) data in ZIP format
-- NeTEx (Network Timetable Exchange) XML data
-- Edifact format data
-- Raw data files (such as rawdata_TC.zip)
+The project has been restructured as a proper Python package:
 
-It also analyzes real-time data which includes:
-- Real-time data with platform change information
-- Real-time data without platform change information
+```
+nmbs-train-data/
+│
+├── requirements.txt        # Project dependencies
+├── setup.py               # Package configuration
+├── main.py                # Main entry point
+│
+├── src/                   # Source code package
+│   └── nmbs_data/         # Main package
+│       ├── data/          # Data access layer
+│       ├── analysis/      # Analysis components
+│       ├── visualization/ # Visualization components
+│       └── webapp/        # Web application
+│
+├── data/                  # Data directory
+│   ├── Planningsgegevens/  # Planning data
+│   ├── Real-time_gegevens/ # Real-time data
+│   └── Maps/              # Generated maps
+│
+├── docs/                  # Documentation
+│
+└── tests/                 # Test suite
+```
 
-## Features
+## Installation
 
-- Data analysis and statistics for different data formats
-- Real-time data monitoring
-- Interactive visualizations of train data
-- **Route map visualization** showing all train routes on an interactive map
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd NMBS-Train-data
+```
 
-## Directory Structure
+2. Install the package and dependencies:
+```bash
+pip install -e .
+```
 
-## How to run
-- python main.py               # Run both analysis and web app
-- python main.py --analyze-only # Run only the analysis
-- python main.py --app-only     # Run only the web app
+## Usage
 
-## Map Visualization
-The application can visualize train routes on an interactive map. To view the map:
-1. Launch the web app
-2. Go to the "Maps" tab
-3. Click "Generate Route Map"
+### Running the Web Application
 
-The map will show all available train routes with stations as markers.
+```bash
+python main.py webapp
+```
+
+### Running the Data Analysis Only
+
+```bash
+python main.py analyze
+```
+
+### Generating a Map Visualization
+
+```bash
+python main.py visualize
+```
+
+## Data Sources
+
+The application works with the following data sources:
+
+1. **Planning Data**: GTFS, NeTEx, and other schedule formats from NMBS/SNCB
+2. **Real-time Data**: GTFS-RT format data with and without platform changes
+
+## Development
+
+### Running Tests
+
+```bash
+pytest tests/
+```
+
+### Package Structure
+
+- **data**: Handles data access and file paths
+- **analysis**: Contains data processing and analysis logic
+- **visualization**: Manages map creation and visualizations
+- **webapp**: Contains the Dash web application components
+
+## License
+
+[Specify your license here]

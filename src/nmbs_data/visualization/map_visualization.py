@@ -9,8 +9,19 @@ import folium
 import zipfile
 from folium.plugins import MarkerCluster, FeatureGroupSubGroup
 import colorsys
-# Fix the import error by using relative import
-from data_paths import DATA_DIR, PLANNING_DIR, MAPS_DIR, ensure_directories
+# Update imports to use the new package structure
+from nmbs_data.data.data_paths import ensure_directories, get_realtime_dirs
+from nmbs_data.data.gtfs_realtime_reader import read_specific_realtime_files, extract_vehicle_positions
+
+# Get paths from data_paths module
+def get_data_paths():
+    """Get standard data paths using data_paths module"""
+    paths = ensure_directories()
+    return {
+        'DATA_DIR': paths['data_dir'],
+        'PLANNING_DIR': paths['planning_dir'],
+        'MAPS_DIR': paths['maps_dir']
+    }
 
 def extract_gtfs_data(gtfs_file=None):
     """
@@ -22,6 +33,9 @@ def extract_gtfs_data(gtfs_file=None):
     Returns:
         tuple: (stations_df, routes_df, trips_df, stop_times_df)
     """
+    paths = get_data_paths()
+    PLANNING_DIR = paths['PLANNING_DIR']
+    
     if gtfs_file is None:
         # Find first GTFS file in planning directory
         for file in os.listdir(PLANNING_DIR):
@@ -67,6 +81,9 @@ def load_station_data(file_path=None):
     Returns:
         dict: Dictionary mapping station IDs to coordinates
     """
+    paths = get_data_paths()
+    PLANNING_DIR = paths['PLANNING_DIR']
+    
     station_coords = {}
     
     # Try to get station data from GTFS
@@ -256,6 +273,9 @@ def load_route_data(file_path=None):
     Returns:
         list: List of routes, each containing a sequence of station IDs
     """
+    paths = get_data_paths()
+    PLANNING_DIR = paths['PLANNING_DIR']
+    
     # Try to construct routes from GTFS
     stops_df, routes_df, trips_df, stop_times_df = extract_gtfs_data(file_path)
     
@@ -385,58 +405,63 @@ def create_route_map(routes, station_coords, output_path=None, realtime_data=Non
         realtime_group = folium.FeatureGroup(name="Real-time Vehicles")
         
         try:
-            # Try to extract vehicle positions
-            from gtfs_realtime_reader import extract_vehicle_positions
+            # Try to extract vehicle positions using function from the gtfs_realtime_reader module
+            if isinstance(realtime_data, dict) and "vehicle_positions" in realtime_data:
+                # Already processed positions
+                positions = realtime_data["vehicle_positions"]
+            else:
+                # Process each realtime file
+                positions = []
+                for data_source, rt_files in realtime_data.items():
+                    for filename, data in rt_files.items():
+                        if isinstance(data, dict) and "entities" in data:
+                            # This looks like GTFS real-time data
+                            pos = extract_vehicle_positions({data_source: data})
+                            positions.extend(pos)
             
-            # Process each realtime file
-            for data_source, rt_files in realtime_data.items():
-                for filename, data in rt_files.items():
-                    if isinstance(data, dict) and "entities" in data:
-                        # This looks like GTFS real-time data
-                        positions = extract_vehicle_positions(data)
-                        
-                        for pos in positions:
-                            # Create a vehicle marker with rotation
-                            tooltip = f"Train {pos.get('trip_id', 'Unknown')}"
-                            popup_html = f"""
-                            <div>
-                                <h4>Train {pos.get('trip_id', 'Unknown')}</h4>
-                                <p>Route: {pos.get('route_id', 'Unknown')}</p>
-                                <p>Status: {pos.get('status', 'Unknown')}</p>
-                                <p>Speed: {pos.get('speed', 'Unknown')} km/h</p>
-                                <p>Last update: {pos.get('timestamp', 'Unknown')}</p>
-                            </div>
-                            """
-                            
-                            # Use different icon colors based on data source
-                            color = "red" if "met_info" in data_source else "green"
-                            
-                            # Create a vehicle icon that shows direction if bearing is available
-                            if pos.get('bearing') is not None:
-                                icon = folium.features.DivIcon(
-                                    icon_size=(20, 20),
-                                    icon_anchor=(10, 10),
-                                    html=f'''
-                                    <div style="
-                                        width: 0; 
-                                        height: 0; 
-                                        border-left: 10px solid transparent;
-                                        border-right: 10px solid transparent;
-                                        border-bottom: 20px solid {color};
-                                        transform: rotate({pos.get('bearing', 0)}deg);
-                                        transform-origin: center;
-                                    "></div>
-                                    '''
-                                )
-                            else:
-                                icon = folium.Icon(color=color, icon="subway", prefix="fa")
-                                
-                            folium.Marker(
-                                location=[pos['latitude'], pos['longitude']],
-                                tooltip=tooltip,
-                                popup=popup_html,
-                                icon=icon
-                            ).add_to(realtime_group)
+            # Add each vehicle position to the map
+            for pos in positions:
+                # Create a vehicle marker with rotation
+                tooltip = f"Train {pos.get('trip_id', 'Unknown')}"
+                popup_html = f"""
+                <div>
+                    <h4>Train {pos.get('trip_id', 'Unknown')}</h4>
+                    <p>Route: {pos.get('route_id', 'Unknown')}</p>
+                    <p>Status: {pos.get('status', 'Unknown')}</p>
+                    <p>Speed: {pos.get('speed', 'Unknown')} km/h</p>
+                    <p>Last update: {pos.get('timestamp', 'Unknown')}</p>
+                </div>
+                """
+                
+                # Use different icon colors based on platform change status
+                color = "red" if pos.get('has_platform_change', False) else "green"
+                
+                # Create a vehicle icon that shows direction if bearing is available
+                if pos.get('bearing') is not None:
+                    icon = folium.features.DivIcon(
+                        icon_size=(20, 20),
+                        icon_anchor=(10, 10),
+                        html=f'''
+                        <div style="
+                            width: 0; 
+                            height: 0; 
+                            border-left: 10px solid transparent;
+                            border-right: 10px solid transparent;
+                            border-bottom: 20px solid {color};
+                            transform: rotate({pos.get('bearing', 0)}deg);
+                            transform-origin: center;
+                        "></div>
+                        '''
+                    )
+                else:
+                    icon = folium.Icon(color=color, icon="subway", prefix="fa")
+                    
+                folium.Marker(
+                    location=[pos['latitude'], pos['longitude']],
+                    tooltip=tooltip,
+                    popup=popup_html,
+                    icon=icon
+                ).add_to(realtime_group)
             
             realtime_group.add_to(m)
         except Exception as e:
@@ -496,6 +521,10 @@ def visualize_train_routes(gtfs_file=None, routes_file=None, stations_file=None,
     Returns:
         str: Path to the generated map file
     """
+    # Get paths from data_paths module
+    paths = get_data_paths()
+    MAPS_DIR = paths['MAPS_DIR']
+    
     # Ensure directories exist
     ensure_directories()
     
@@ -520,46 +549,44 @@ def visualize_train_routes(gtfs_file=None, routes_file=None, stations_file=None,
     realtime_data = None
     if include_realtime:
         try:
-            # First try to read from the specific bin files
-            try:
-                from gtfs_realtime_reader import read_specific_realtime_files, extract_vehicle_positions
+            # Try to read from the specific bin files using the gtfs_realtime_reader module
+            specific_realtime_data = read_specific_realtime_files()
+            
+            if specific_realtime_data and not any('error' in data for data in specific_realtime_data.values()):
+                # Process the data for map visualization
+                vehicle_positions = []
+                for data_type, data in specific_realtime_data.items():
+                    if 'error' not in data:
+                        positions = extract_vehicle_positions({data_type: data})
+                        vehicle_positions.extend(positions)
                 
-                # Try to read the data from the specific files
-                specific_realtime_data = read_specific_realtime_files()
-                
-                if specific_realtime_data:
-                    # Process the data for map visualization
-                    vehicle_positions = []
-                    for data_type, data in specific_realtime_data.items():
-                        if "error" not in data:
-                            positions = extract_vehicle_positions({data_type: data})
-                            vehicle_positions.extend(positions)
-                    
-                    if vehicle_positions:
-                        print(f"Using {len(vehicle_positions)} vehicle positions from specific real-time files")
-                        realtime_data = {"vehicle_positions": vehicle_positions}
-                        # Continue with this data
-            except Exception as e:
-                print(f"Could not read specific real-time files: {e}")
-                
-            # If specific files failed, fall back to directory scanning
-            if not realtime_data:
-                from data_paths import get_realtime_dirs
-                from gtfs_realtime_reader import process_realtime_directory
-                
+                if vehicle_positions:
+                    print(f"Using {len(vehicle_positions)} vehicle positions from specific real-time files")
+                    realtime_data = {"vehicle_positions": vehicle_positions}
+            else:
+                # If specific file reading failed, fall back to general approach
+                print("Falling back to scanning real-time directories")
                 realtime_dirs = get_realtime_dirs()
                 realtime_data = {}
                 
-                # Process each directory
+                # Process each directory (simplified to just note the files)
                 for i, dir_path in enumerate(realtime_dirs):
                     key = 'with_platform_changes' if i == 0 else 'without_platform_changes'
-                    realtime_data[key] = process_realtime_directory(dir_path, convert_to_json=False)
+                    realtime_data[key] = {}
+                    
+                    for file in os.listdir(dir_path):
+                        if file.endswith('.json'):
+                            try:
+                                with open(os.path.join(dir_path, file), 'r') as f:
+                                    realtime_data[key][file] = json.load(f)
+                            except Exception as e:
+                                print(f"Error loading {file}: {e}")
                 
                 print(f"Loaded real-time data from {len(realtime_dirs)} directories")
         except Exception as e:
             print(f"Error loading real-time data: {e}")
     
-    # Create and save map with dark_mode parameter
+    # Create and save map
     print(f"Creating map with {len(routes)} routes and {len(station_coords)} stations...")
     m = create_route_map(routes, station_coords, output_path, realtime_data, dark_mode)
     print(f"Map created and saved to: {output_path}")
@@ -570,4 +597,3 @@ if __name__ == "__main__":
     # When run directly, generate a map using default settings
     map_path = visualize_train_routes()
     print(f"To view the map, open: {map_path}")
-

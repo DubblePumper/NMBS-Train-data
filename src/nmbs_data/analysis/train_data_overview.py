@@ -1,3 +1,7 @@
+"""
+Module for analyzing train data from various sources and generating analytics.
+"""
+
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -12,10 +16,16 @@ import numpy as np
 import io
 import shutil
 
+# Update imports to use new package structure
+from nmbs_data.data.data_paths import ensure_directories, get_realtime_dirs, clean_realtime_dirs
+from nmbs_data.data.gtfs_realtime_reader import read_specific_realtime_files, create_sample_files
+
 class TrainDataAnalyzer:
-    def __init__(self, planning_dir="../data/Planningsgegevens", realtime_dir="../data/Real-time_gegevens"):
-        self.planning_dir = planning_dir
-        self.realtime_dir = realtime_dir
+    def __init__(self, planning_dir=None, realtime_dir=None):
+        # Use the data paths module to get standard paths if not provided
+        paths = ensure_directories()
+        self.planning_dir = planning_dir if planning_dir else paths['planning_dir']
+        self.realtime_dir = realtime_dir if realtime_dir else paths['realtime_dir']
         self.planning_data = None
         self.realtime_data = None
         self.netex_data = None
@@ -237,14 +247,14 @@ class TrainDataAnalyzer:
                         self.realtime_data[key][file_name] = xml_data
                         print(f"Successfully loaded XML: {file_name}")
                     elif file_path.endswith('.pb') or file_path.endswith('.bin'):
-                        # Process GTFS real-time Protocol Buffer data
+                        # Process GTFS real-time Protocol Buffer data using our module
                         try:
-                            from gtfs_realtime_reader import read_gtfs_rt_file
-                            gtfs_data = read_gtfs_rt_file(file_path)
-                            self.realtime_data[key][file_name] = gtfs_data
-                            print(f"Successfully loaded GTFS real-time: {file_name}")
-                        except ImportError:
-                            print(f"Unable to load GTFS real-time file {file_name}: gtfs-realtime-bindings not installed")
+                            gtfs_data = read_specific_realtime_files()
+                            if gtfs_data:
+                                self.realtime_data[key][file_name] = gtfs_data
+                                print(f"Successfully loaded GTFS real-time: {file_name}")
+                        except Exception as e:
+                            print(f"Error reading GTFS real-time file {file_name}: {str(e)}")
                     else:
                         print(f"Unsupported real-time file format: {file_path}")
                 except Exception as e:
@@ -254,17 +264,15 @@ class TrainDataAnalyzer:
         if should_create_samples or created_dirs:
             print("Creating sample real-time data files for demonstration...")
             try:
-                # First try to create GTFS real-time samples if the module is available
-                try:
-                    from gtfs_realtime_reader import create_sample_files_in_directories
-                    created_files = create_sample_files_in_directories(realtime_dirs)
-                    if created_files:
-                        print(f"Created {len(created_files)} sample GTFS real-time files")
-                        # Load the created sample files
-                        self.load_realtime_data()  # Recursive call to load the new files
-                        return self.realtime_data
-                except ImportError:
-                    print("gtfs-realtime-bindings not installed, falling back to JSON samples")
+                # Create GTFS real-time samples
+                create_files_result = create_sample_files()
+                if create_files_result:
+                    print("Created sample GTFS real-time files")
+                    # Load the created sample files
+                    self.load_realtime_data()  # Recursive call to load the new files
+                    return self.realtime_data
+                else:
+                    print("Could not create GTFS real-time samples, falling back to JSON samples")
                     self._create_sample_realtime_data(realtime_dirs)
             except Exception as e:
                 print(f"Error creating sample data: {str(e)}")
@@ -539,6 +547,7 @@ class TrainDataAnalyzer:
     
     def _create_summary_visualization(self, output_dir):
         """Create a summary visualization of all data"""
+        # ...existing code...
         plt.figure(figsize=(12, 8))
         
         # Count data sources
@@ -579,6 +588,7 @@ class TrainDataAnalyzer:
     
     def _create_gtfs_visualizations(self, output_dir):
         """Create visualizations for GTFS data"""
+        # ...existing code...
         # Create directory for GTFS visualizations
         gtfs_dir = os.path.join(output_dir, "gtfs")
         os.makedirs(gtfs_dir, exist_ok=True)
@@ -615,6 +625,7 @@ class TrainDataAnalyzer:
     
     def _create_realtime_visualizations(self, output_dir):
         """Create visualizations for real-time data"""
+        # ...existing code...
         realtime_dir = os.path.join(output_dir, "realtime")
         os.makedirs(realtime_dir, exist_ok=True)
         

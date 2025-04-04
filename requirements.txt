@@ -1,0 +1,19 @@
+# NMBS Train Data Analysis and Visualization Tool
+# Core dependencies
+pandas>=1.3.0
+matplotlib>=3.4.0
+numpy>=1.20.0
+
+# Web application
+dash>=2.0.0
+plotly>=5.0.0
+
+# Visualization
+folium>=0.12.0
+
+# GTFS data processing
+gtfs-realtime-bindings>=1.0.0
+protobuf>=3.20.0
+
+# Testing (optional)
+pytest>=6.0.0
