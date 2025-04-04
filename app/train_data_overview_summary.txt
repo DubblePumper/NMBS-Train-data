@@ -1,16 +1,16 @@
 NMBS Train Data Overview
-Generated: 2025-04-03 23:26:58.823277
+Generated: 2025-04-04 09:39:18.294583
 
 Planning Data:
-  GTFS Files: 1
-  NeTEx Files: 1
-  Edifact Files: 1
-  Raw Data Files: 1
+  GTFS Files: 0
+  NeTEx Files: 0
+  Edifact Files: 0
+  Raw Data Files: 0
 
 Real-time Data:
   With Platform Changes: 1
   Without Platform Changes: 1
 
 Real-time Data Directories:
-  C:\Users\sande\Documents\GitHub\NMBS-Train-data\data\Real-time_gegevens\real-time_gegevens_met_info_over_spoorveranderingen
-  C:\Users\sande\Documents\GitHub\NMBS-Train-data\data\Real-time_gegevens\real-time_gegevens_zonder_info_over_spoorveranderingen
+  C:\Users\sande\Documents\codeprojects\NMBS-Train-data\data\Real-time_gegevens\real-time_gegevens_met_info_over_spoorveranderingen
+  C:\Users\sande\Documents\codeprojects\NMBS-Train-data\data\Real-time_gegevens\real-time_gegevens_zonder_info_over_spoorveranderingen
