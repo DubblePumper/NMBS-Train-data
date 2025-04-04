@@ -12,17 +12,24 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(APP_DIR)
 
 # Define paths to data directories
-DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+# Updated to use src\data structure as requested
+SRC_DIR = os.path.join(PROJECT_ROOT, "src")
+Path(SRC_DIR).mkdir(exist_ok=True)  # Create src directory if it doesn't exist
+
+DATA_DIR = os.path.join(SRC_DIR, "data")
 PLANNING_DIR = os.path.join(DATA_DIR, "Planningsgegevens")
 REALTIME_DIR = os.path.join(DATA_DIR, "Real-time_gegevens")
+MAPS_DIR = os.path.join(DATA_DIR, "Maps")  # New directory for map visualizations
 
 # Ensure data directories exist
 def ensure_directories():
     """Ensure all required data directories exist"""
     directories = [
+        SRC_DIR,        # Make sure src directory exists
         DATA_DIR,
         PLANNING_DIR,
-        REALTIME_DIR
+        REALTIME_DIR,
+        MAPS_DIR
     ]
     
     # Create parent directories first
@@ -55,9 +62,11 @@ def ensure_directories():
                 print(f"Could not create directory {subdir} - will continue anyway")
     
     return {
+        'src_dir': SRC_DIR,
         'data_dir': DATA_DIR,
         'planning_dir': PLANNING_DIR,
-        'realtime_dir': REALTIME_DIR
+        'realtime_dir': REALTIME_DIR,
+        'maps_dir': MAPS_DIR
     }
 
 # Function to get absolute paths for realtime directories

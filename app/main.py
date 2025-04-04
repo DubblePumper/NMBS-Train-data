@@ -15,6 +15,36 @@ app_dir = os.path.dirname(os.path.abspath(__file__))
 if app_dir not in sys.path:
     sys.path.insert(0, app_dir)
 
+# Check and install required packages
+def check_requirements():
+    """Check if required packages are installed and install them if missing"""
+    try:
+        import importlib
+        required_packages = [
+            "pandas", "matplotlib", "numpy", "dash", "plotly", "folium", 
+            "protobuf"
+        ]
+        
+        for package in required_packages:
+            try:
+                importlib.import_module(package)
+            except ImportError:
+                print(f"Installing required package: {package}")
+                subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+                
+        # Handle the special case for gtfs-realtime-bindings
+        try:
+            importlib.import_module("google.transit.gtfs_realtime_pb2")
+        except ImportError:
+            print("Installing gtfs-realtime-bindings")
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "gtfs-realtime-bindings"])
+            
+        print("All required packages are installed.")
+        return True
+    except Exception as e:
+        print(f"Error checking/installing requirements: {e}")
+        return False
+
 from data_paths import ensure_directories, clean_realtime_dirs
 from train_data_overview import TrainDataAnalyzer
 
@@ -54,6 +84,37 @@ def run_analysis(force_clean=False):
         overview_path = os.path.join(app_dir, "train_data_overview.json")
         analyzer.save_overview(overview, filename=overview_path)
         
+        # Generate sample GTFS realtime data if needed
+        try:
+            print("\nGenerating and reading GTFS real-time data...")
+            from gtfs_realtime_reader import create_sample_files, read_specific_realtime_files
+            
+            # Create sample files if they don't exist
+            create_sample_files()
+            
+            # Read the real-time data from the specific files
+            realtime_data = read_specific_realtime_files()
+            if realtime_data:
+                print("Successfully read GTFS real-time data from specific files")
+                
+                # Save as JSON for easier inspection
+                import json
+                realtime_json_path = os.path.join(app_dir, "realtime_data.json")
+                with open(realtime_json_path, 'w') as f:
+                    json.dump(realtime_data, f, indent=2)
+                print(f"Real-time data saved as JSON to {realtime_json_path}")
+        except Exception as e:
+            print(f"Note: GTFS real-time data processing skipped: {e}")
+        
+        # Pre-generate a route map for faster loading in the app
+        try:
+            print("\nPre-generating route map...")
+            from map_visualization import visualize_train_routes
+            map_path = visualize_train_routes(output_file="default_route_map.html")
+            print(f"Default map created at {map_path}")
+        except Exception as e:
+            print(f"Warning: Could not pre-generate route map: {e}")
+        
         print("\nData analysis complete!")
         print(f"Overview saved to {overview_path}")
         
@@ -72,6 +133,7 @@ def run_analysis(force_clean=False):
 def run_webapp():
     """Run the Dash web application"""
     try:
+        os.environ["DASH_DARK_MODE"] = "1"  # Set environment variable for dark mode
         app_path = os.path.join(app_dir, "app.py")
         print(f"Starting web application from {app_path}")
         subprocess.run([sys.executable, app_path])
@@ -100,6 +162,9 @@ if __name__ == "__main__":
     )
     
     args = parser.parse_args()
+    
+    # Check requirements first
+    check_requirements()
     
     if args.app_only:
         run_webapp()

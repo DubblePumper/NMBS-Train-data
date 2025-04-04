@@ -204,7 +204,7 @@ class TrainDataAnalyzer:
                     readme_path = os.path.join(dir_path, "README.txt")
                     with open(readme_path, 'w') as f:
                         f.write(f"This directory is for NMBS real-time data.\n")
-                        f.write(f"Data should be in JSON or XML format.\n")
+                        f.write(f"Data can be in JSON, XML, or GTFS real-time Protocol Buffer (.pb or .bin) format.\n")
                         f.write(f"Created on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                     print(f"Created README file in {dir_path}")
                     
@@ -230,12 +230,21 @@ class TrainDataAnalyzer:
                     if file_path.endswith('.json'):
                         df = pd.read_json(file_path)
                         self.realtime_data[key][file_name] = df
-                        print(f"Successfully loaded: {file_name}")
+                        print(f"Successfully loaded JSON: {file_name}")
                     elif file_path.endswith('.xml'):
                         # Process XML real-time data
                         xml_data = self._process_realtime_xml(file_path)
                         self.realtime_data[key][file_name] = xml_data
                         print(f"Successfully loaded XML: {file_name}")
+                    elif file_path.endswith('.pb') or file_path.endswith('.bin'):
+                        # Process GTFS real-time Protocol Buffer data
+                        try:
+                            from gtfs_realtime_reader import read_gtfs_rt_file
+                            gtfs_data = read_gtfs_rt_file(file_path)
+                            self.realtime_data[key][file_name] = gtfs_data
+                            print(f"Successfully loaded GTFS real-time: {file_name}")
+                        except ImportError:
+                            print(f"Unable to load GTFS real-time file {file_name}: gtfs-realtime-bindings not installed")
                     else:
                         print(f"Unsupported real-time file format: {file_path}")
                 except Exception as e:
@@ -244,12 +253,30 @@ class TrainDataAnalyzer:
         # Create sample data if both directories are empty or newly created
         if should_create_samples or created_dirs:
             print("Creating sample real-time data files for demonstration...")
-            self._create_sample_realtime_data(realtime_dirs)
+            try:
+                # First try to create GTFS real-time samples if the module is available
+                try:
+                    from gtfs_realtime_reader import create_sample_files_in_directories
+                    created_files = create_sample_files_in_directories(realtime_dirs)
+                    if created_files:
+                        print(f"Created {len(created_files)} sample GTFS real-time files")
+                        # Load the created sample files
+                        self.load_realtime_data()  # Recursive call to load the new files
+                        return self.realtime_data
+                except ImportError:
+                    print("gtfs-realtime-bindings not installed, falling back to JSON samples")
+                    self._create_sample_realtime_data(realtime_dirs)
+            except Exception as e:
+                print(f"Error creating sample data: {str(e)}")
+                # Fall back to JSON samples
+                self._create_sample_realtime_data(realtime_dirs)
         
         return self.realtime_data
     
     def _create_sample_realtime_data(self, realtime_dirs):
         """Create sample real-time data files for demonstration"""
+        print("Creating sample real-time data files for demonstration...")
+        
         # Sample data with platform changes
         with_changes_sample = {
             "timestamp": datetime.now().isoformat(),
@@ -329,8 +356,16 @@ class TrainDataAnalyzer:
             with_changes_dir = realtime_dirs[0]
             without_changes_dir = realtime_dirs[1]
             
+            # Clean up potential existing files to avoid duplication
             sample_path_with_changes = os.path.join(with_changes_dir, "sample_data_with_platform_changes.json")
             sample_path_without_changes = os.path.join(without_changes_dir, "sample_data_without_platform_changes.json")
+            
+            for path in [sample_path_with_changes, sample_path_without_changes]:
+                if os.path.exists(path):
+                    try:
+                        os.remove(path)
+                    except:
+                        pass
             
             # Write the sample data files
             with open(sample_path_with_changes, 'w') as f:

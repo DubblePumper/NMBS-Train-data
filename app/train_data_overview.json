@@ -1,26 +1,31 @@
 {
   "planning_data": {
-    "total_files": "3",
-    "gtfs_files": "0",
-    "netex_files": "0",
+    "total_files": "4",
+    "gtfs_files": "1",
+    "netex_files": "1",
     "edifact_files": "1",
-    "rawdata_files": "2"
+    "rawdata_files": "1"
   },
   "realtime_data": {
     "with_platform_changes": "1",
     "without_platform_changes": "1"
   },
+  "gtfs_stats": {
+    "naar_de_planningsgegevens_zonder_perroninfo(GTFS).zip": "{'tables': {'trips.txt': {'record_count': 37998, 'columns': ['route_id', 'service_id', 'trip_id', 'trip_headsign', 'trip_short_name', 'direction_id', 'block_id', 'shape_id', 'trip_type']}, 'stop_times.txt': {'record_count': 647922, 'columns': ['trip_id', 'arrival_time', 'departure_time', 'stop_id', 'stop_sequence', 'stop_headsign', 'pickup_type', 'drop_off_type', 'shape_dist_traveled']}, 'stop_time_overrides.txt': {'record_count': 321624, 'columns': ['trip_id', 'stop_sequence', 'service_id', 'stop_id']}, 'stops.txt': {'record_count': 2676, 'columns': ['stop_id', 'stop_code', 'stop_name', 'stop_desc', 'stop_lat', 'stop_lon', 'zone_id', 'stop_url', 'location_type', 'parent_station', 'platform_code', 'stop_timezone']}, 'routes.txt': {'record_count': 948, 'columns': ['route_id', 'agency_id', 'route_short_name', 'route_long_name', 'route_desc', 'route_type', 'route_url', 'route_color', 'route_text_color']}, 'agency.txt': {'record_count': 1, 'columns': ['agency_id', 'agency_name', 'agency_url', 'agency_timezone', 'agency_lang', 'agency_phone']}, 'transfers.txt': {'record_count': 636, 'columns': ['from_stop_id', 'to_stop_id', 'transfer_type', 'min_transfer_time', 'from_route_id', 'to_route_id', 'from_trip_id', 'to_trip_id']}, 'calendar.txt': {'record_count': 10878, 'columns': ['service_id', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday', 'start_date', 'end_date']}, 'calendar_dates.txt': {'record_count': 1239389, 'columns': ['service_id', 'date', 'exception_type']}, 'translations.txt': {'record_count': 2103, 'columns': ['table_name', 'field_name', 'language', 'translation', 'record_id', 'record_sub_id', 'field_value']}}, 'total_records': 2264175}"
+  },
+  "netex_stats": {
+    "naar_de_planningsgegevens(Netex).xml": "{'StopPlace': 1726, 'ScheduledStopPoint': 72440, 'ServiceJourney': 31243, 'Line': 39, 'Route': 0}"
+  },
   "rawdata_stats": {
-    "rawdata (2).zip": "{'file_count': 10, 'file_types': {'.txt': 10}, 'file_info': {'size': 8787544, 'last_modified': '2025-04-04 09:44:25'}}",
-    "rawdata_TC (2).zip": "{'file_count': 13, 'file_types': {'': 1, '.cfg': 1, '.txt': 10, '.csv': 1}, 'file_info': {'size': 9221320, 'last_modified': '2025-04-04 09:44:25'}}"
+    "rawdata_TC.zip": "{'file_count': 13, 'file_types': {'': 1, '.txt': 10, '.cfg': 1, '.csv': 1}, 'file_info': {'size': 9129080, 'last_modified': '2025-04-03 23:09:54'}}"
   },
   "realtime_stats": {
-    "with_platform_changes": "{'sample_data_with_platform_changes.json': {'record_count': 1, 'columns': ['station_updates']}}",
-    "without_platform_changes": "{'sample_data_without_platform_changes.json': {'record_count': 1, 'columns': ['station_updates']}}"
+    "with_platform_changes": "{'sample_realtime.pb': {'file_size': 0, 'format': 'Unknown'}}",
+    "without_platform_changes": "{'sample_realtime.pb': {'file_size': 0, 'format': 'Unknown'}}"
   },
   "metadata": {
-    "generated_at": "2025-04-04 09:46:17.587961",
-    "planning_dir": "C:\\Users\\sande\\Documents\\codeprojects\\NMBS-Train-data\\data\\Planningsgegevens",
-    "realtime_dir": "C:\\Users\\sande\\Documents\\codeprojects\\NMBS-Train-data\\data\\Real-time_gegevens"
+    "generated_at": "2025-04-04 21:12:07.367705",
+    "planning_dir": "C:\\Users\\sande\\Documents\\GitHub\\NMBS-Train-data\\src\\data\\Planningsgegevens",
+    "realtime_dir": "C:\\Users\\sande\\Documents\\GitHub\\NMBS-Train-data\\src\\data\\Real-time_gegevens"
   }
 }

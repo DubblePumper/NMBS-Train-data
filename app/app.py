@@ -8,8 +8,32 @@ import os
 import ast
 from train_data_overview import TrainDataAnalyzer
 
-# Initialize the Dash app
-app = dash.Dash(__name__, title="NMBS Train Data Analysis")
+# Set dark mode theme colors
+dark_bg_color = "#121212"
+dark_paper_color = "#1e1e1e"
+dark_text_color = "#e0e0e0"
+dark_grid_color = "#333333"
+
+# Initialize the Dash app with dark theme
+app = dash.Dash(
+    __name__, 
+    title="NMBS Train Data Analysis",
+    meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}],
+)
+
+# Dark theme for Plotly figures
+dark_template = go.layout.Template(
+    layout=dict(
+        paper_bgcolor=dark_paper_color,
+        plot_bgcolor=dark_bg_color,
+        font=dict(color=dark_text_color),
+        xaxis=dict(gridcolor=dark_grid_color, zerolinecolor=dark_grid_color),
+        yaxis=dict(gridcolor=dark_grid_color, zerolinecolor=dark_grid_color),
+        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=dark_text_color)),
+        title=dict(font=dict(color=dark_text_color)),
+        margin=dict(l=40, r=20, t=40, b=40),
+    )
+)
 
 # Load overview data
 try:
@@ -171,6 +195,25 @@ app.layout = html.Div([
                     html.Div(id='update-status')
                 ], className="info-box")
             ])
+        ]),
+        
+        # Maps Tab
+        dcc.Tab(label="Maps", children=[
+            html.Div([
+                html.H2("Train Route Map"),
+                html.P("Visualize train routes on an interactive map. This shows the network of routes based on available data."),
+                html.Div([
+                    html.Button("Generate Route Map", id="generate-map-button", className="button"),
+                    html.Div(id="map-status"),
+                ], style={"margin": "20px 0"}),
+                html.Div([
+                    html.Iframe(
+                        id="map-iframe",
+                        style={"width": "100%", "height": "600px", "border": "none"},
+                        src=""
+                    )
+                ], id="map-container", style={"display": "none"})
+            ])
         ])
     ])
 ])
@@ -180,15 +223,18 @@ app.layout = html.Div([
     Input('data-type-dropdown', 'value')
 )
 def update_graph(data_type):
+    # Create a base figure with dark mode template
+    fig = go.Figure(layout=dict(template=dark_template))
+    
     if data_type == 'gtfs':
         # Use actual GTFS data for visualization
         gtfs_data = get_gtfs_data()
         if gtfs_data:
-            fig = px.bar(gtfs_data, x='category', y='count', title='GTFS Data Overview')
+            fig = px.bar(gtfs_data, x='category', y='count', title='GTFS Data Overview',
+                         template="plotly_dark")
             # Sort by count descending for better visualization
             fig.update_layout(xaxis={'categoryorder':'total descending'})
         else:
-            fig = go.Figure()
             fig.update_layout(title="No GTFS data available")
         
     elif data_type == 'netex':
@@ -204,9 +250,9 @@ def update_graph(data_type):
             
             categories = list(first_file.keys())
             counts = list(first_file.values())
-            fig = px.bar(x=categories, y=counts, title='NeTEx Element Counts')
+            fig = px.bar(x=categories, y=counts, title='NeTEx Element Counts',
+                         template="plotly_dark")
         else:
-            fig = go.Figure()
             fig.update_layout(title="No NeTEx data available")
             
     elif data_type == 'realtime':
@@ -215,7 +261,8 @@ def update_graph(data_type):
         data = {'category': ['With platform changes', 'Without platform changes'],
                 'count': [realtime_data['with_changes'], realtime_data['without_changes']]}
         
-        fig = px.bar(data, x='category', y='count', title='Real-time Data Overview')
+        fig = px.bar(data, x='category', y='count', title='Real-time Data Overview',
+                     template="plotly_dark", color_discrete_sequence=['#4dabf7', '#74c0fc'])
         
         # Add note if no data
         if sum(data['count']) == 0:
@@ -259,7 +306,7 @@ def update_graph(data_type):
                         parents=parents,
                         values=values,
                     ))
-                    fig.update_layout(title='Raw Data File Types')
+                    fig.update_layout(title='Raw Data File Types', template="plotly_dark")
                 else:
                     # Fallback to bar chart
                     fig = go.Figure()
@@ -268,12 +315,10 @@ def update_graph(data_type):
                         y=[parse_string_dict(rawdata_stats[first_file_name]).get('file_count', 0)],
                         name='File Count'
                     ))
-                    fig.update_layout(title='Raw Data File Count')
+                    fig.update_layout(title='Raw Data File Count', template="plotly_dark")
             except Exception as e:
-                fig = go.Figure()
                 fig.update_layout(title=f"Error creating raw data visualization: {str(e)}")
         else:
-            fig = go.Figure()
             fig.update_layout(title="No raw data available")
     
     elif data_type == 'format_comparison':
@@ -292,28 +337,36 @@ def update_graph(data_type):
             r=static_support,
             theta=formats,
             fill='toself',
-            name='Static Schedule Support'
+            name='Static Schedule Support',
+            line=dict(color="#4dabf7"),
+            fillcolor="rgba(77, 171, 247, 0.3)"
         ))
         
         fig.add_trace(go.Scatterpolar(
             r=realtime_support,
             theta=formats,
             fill='toself',
-            name='Real-time Support'
+            name='Real-time Support',
+            line=dict(color="#51cf66"),
+            fillcolor="rgba(81, 207, 102, 0.3)"
         ))
         
         fig.add_trace(go.Scatterpolar(
             r=standardization,
             theta=formats,
             fill='toself',
-            name='Standardization Level'
+            name='Standardization Level',
+            line=dict(color="#fcc419"),
+            fillcolor="rgba(252, 196, 25, 0.3)"
         ))
         
         fig.add_trace(go.Scatterpolar(
             r=eu_adoption,
             theta=formats,
             fill='toself',
-            name='EU Adoption'
+            name='EU Adoption',
+            line=dict(color="#ff6b6b"),
+            fillcolor="rgba(255, 107, 107, 0.3)"
         ))
         
         # Update layout
@@ -321,16 +374,25 @@ def update_graph(data_type):
             polar=dict(
                 radialaxis=dict(
                     visible=True,
-                    range=[0, 5]
-                )
+                    range=[0, 5],
+                    color=dark_text_color
+                ),
+                bgcolor=dark_paper_color
             ),
             showlegend=True,
-            title="Transit Data Format Comparison"
+            title="Transit Data Format Comparison",
+            template="plotly_dark"
         )
     
     else:
-        fig = go.Figure()
         fig.update_layout(title="Select a data type")
+    
+    # Apply dark theme to all figures
+    fig.update_layout(
+        paper_bgcolor=dark_paper_color,
+        plot_bgcolor=dark_bg_color,
+        font=dict(color=dark_text_color),
+    )
     
     return fig
 
@@ -475,5 +537,43 @@ def update_data(update_clicks, sample_clicks=0):
             return html.Div(f"Error updating data: {str(e)}", style={"color": "red"})
     return ""
 
+@app.callback(
+    [Output('map-iframe', 'src'),
+     Output('map-status', 'children'),
+     Output('map-container', 'style')],
+    [Input('generate-map-button', 'n_clicks')]
+)
+def generate_route_map(n_clicks):
+    if n_clicks is None or n_clicks == 0:
+        return "", "", {"display": "none"}
+    
+    try:
+        # Fix import by using direct import from the app directory
+        from map_visualization import visualize_train_routes
+        
+        # Generate a unique filename based on timestamp
+        import time
+        map_filename = f"train_routes_{int(time.time())}.html"
+        
+        # Generate the map with dark mode
+        map_path = visualize_train_routes(output_file=map_filename, dark_mode=True)
+        
+        # Get relative path for iframe src
+        map_url = f"/assets/{map_filename}"
+        
+        # Copy the map file to the assets directory for Dash to serve it
+        import shutil
+        from pathlib import Path
+        assets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+        Path(assets_dir).mkdir(exist_ok=True)
+        shutil.copy2(map_path, os.path.join(assets_dir, map_filename))
+        
+        return map_url, html.P("Map generated successfully!", style={"color": "green"}), {"display": "block"}
+    except Exception as e:
+        return "", html.P(f"Error generating map: {str(e)}", style={"color": "red"}), {"display": "none"}
+
+# Add server object for gunicorn deployment
+server = app.server
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run_server(debug=True)
