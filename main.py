@@ -32,7 +32,31 @@ def run_webapp():
     """Run the web application"""
     # Import here to avoid loading Dash unnecessarily if not running the webapp
     from nmbs_data.webapp.app import app
-    app.run_server(debug=True)
+    # Do not edit this
+    app.run(debug=True)
+
+def run_all(light_mode=False):
+    """Run analysis, generate visualization, and start the web application"""
+    print("=== Running complete NMBS train data workflow ===")
+    
+    # Step 1: Run the data analysis
+    print("\n=== Step 1: Running data analysis ===")
+    analysis_result = run_analysis()
+    
+    # Step 2: Generate visualization
+    print("\n=== Step 2: Generating map visualization ===")
+    dark_mode = not light_mode
+    map_path = run_visualization(dark_mode=dark_mode)
+    
+    # Step 3: Start the web application
+    print("\n=== Step 3: Starting web application ===")
+    run_webapp()
+    
+    return {
+        "analysis_complete": True,
+        "visualization_path": map_path,
+        "webapp_started": True
+    }
 
 def main():
     """Main entry point with command-line argument parsing"""
@@ -51,6 +75,10 @@ def main():
     # Web app command
     webapp_parser = subparsers.add_parser("webapp", help="Start the web application")
     
+    # All-in-one command (new)
+    all_parser = subparsers.add_parser("all", help="Run analysis, generate visualization, and start webapp")
+    all_parser.add_argument("--light", action="store_true", help="Use light mode for visualization instead of dark mode")
+    
     # Parse arguments
     args = parser.parse_args()
     
@@ -62,6 +90,9 @@ def main():
         run_visualization(dark_mode=dark_mode)
     elif args.command == "webapp":
         run_webapp()
+    elif args.command == "all":
+        light_mode = args.light if hasattr(args, "light") else False
+        run_all(light_mode=light_mode)
     else:
         # Default to running the webapp if no command specified
         print("No command specified, starting web application...")

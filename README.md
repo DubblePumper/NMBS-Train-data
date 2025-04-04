@@ -45,6 +45,18 @@ pip install -e .
 
 ## Usage
 
+### Running Everything (Analysis, Visualization, and Web App)
+
+```bash
+python main.py all
+```
+
+You can also use the `--light` flag to use light mode for the visualization:
+
+```bash
+python main.py all --light
+```
+
 ### Running the Web Application
 
 ```bash
@@ -61,6 +73,12 @@ python main.py analyze
 
 ```bash
 python main.py visualize
+```
+
+You can use the `--light` flag for a light-mode visualization:
+
+```bash
+python main.py visualize --light
 ```
 
 ## Data Sources

@@ -188,96 +188,44 @@ class TrainDataAnalyzer:
             except Exception as e:
                 print(f"Error creating main real-time directory {self.realtime_dir}: {str(e)}")
         
-        realtime_dirs = [
-            os.path.join(self.realtime_dir, "real-time_gegevens_met_info_over_spoorveranderingen"),
-            os.path.join(self.realtime_dir, "real-time_gegevens_zonder_info_over_spoorveranderingen")
-        ]
-        
+        # Initialize the realtime data structure
         self.realtime_data = {
             'with_platform_changes': {},
             'without_platform_changes': {}
         }
         
-        # Create sample real-time data if directories are empty
-        should_create_samples = True
-        created_dirs = []
+        # Check for existing .bin files in the main real-time directory
+        bin_files = [
+            os.path.join(self.realtime_dir, "real-time_gegevens_met_info_over_spoorveranderingen.bin"),
+            os.path.join(self.realtime_dir, "real-time_gegevens_zonder_info_over_spoorveranderingen.bin")
+        ]
         
-        for i, dir_path in enumerate(realtime_dirs):
-            # Create directory if it doesn't exist
-            if not os.path.exists(dir_path):
-                try:
-                    os.makedirs(dir_path, exist_ok=True)
-                    print(f"Created directory: {dir_path}")
-                    created_dirs.append(dir_path)
-                    
-                    # Create a README file with information
-                    readme_path = os.path.join(dir_path, "README.txt")
-                    with open(readme_path, 'w') as f:
-                        f.write(f"This directory is for NMBS real-time data.\n")
-                        f.write(f"Data can be in JSON, XML, or GTFS real-time Protocol Buffer (.pb or .bin) format.\n")
-                        f.write(f"Created on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                    print(f"Created README file in {dir_path}")
-                    
-                except Exception as e:
-                    print(f"Error creating directory {dir_path}: {str(e)}")
-                    continue  # Skip this directory if we can't create it
-            
-            # Process files in the directory
-            realtime_files = glob.glob(os.path.join(dir_path, "*"))
-            key = 'with_platform_changes' if i == 0 else 'without_platform_changes'
-            
-            # Filter out README.txt
-            realtime_files = [f for f in realtime_files if not f.endswith('README.txt')]
-            
-            print(f"Found {len(realtime_files)} real-time files in {key}")
-            
-            if len(realtime_files) > 0:
-                should_create_samples = False
-            
-            for file_path in realtime_files:
-                try:
-                    file_name = os.path.basename(file_path)
-                    if file_path.endswith('.json'):
-                        df = pd.read_json(file_path)
-                        self.realtime_data[key][file_name] = df
-                        print(f"Successfully loaded JSON: {file_name}")
-                    elif file_path.endswith('.xml'):
-                        # Process XML real-time data
-                        xml_data = self._process_realtime_xml(file_path)
-                        self.realtime_data[key][file_name] = xml_data
-                        print(f"Successfully loaded XML: {file_name}")
-                    elif file_path.endswith('.pb') or file_path.endswith('.bin'):
-                        # Process GTFS real-time Protocol Buffer data using our module
-                        try:
-                            gtfs_data = read_specific_realtime_files()
-                            if gtfs_data:
-                                self.realtime_data[key][file_name] = gtfs_data
-                                print(f"Successfully loaded GTFS real-time: {file_name}")
-                        except Exception as e:
-                            print(f"Error reading GTFS real-time file {file_name}: {str(e)}")
-                    else:
-                        print(f"Unsupported real-time file format: {file_path}")
-                except Exception as e:
-                    print(f"Error loading {file_path}: {str(e)}")
+        bin_files_exist = [os.path.exists(path) for path in bin_files]
         
-        # Create sample data if both directories are empty or newly created
-        if should_create_samples or created_dirs:
-            print("Creating sample real-time data files for demonstration...")
+        if any(bin_files_exist):
+            # Use the existing bin files
+            print(f"Found existing GTFS-realtime bin files")
             try:
-                # Create GTFS real-time samples
-                create_files_result = create_sample_files()
-                if create_files_result:
-                    print("Created sample GTFS real-time files")
-                    # Load the created sample files
-                    self.load_realtime_data()  # Recursive call to load the new files
-                    return self.realtime_data
-                else:
-                    print("Could not create GTFS real-time samples, falling back to JSON samples")
-                    self._create_sample_realtime_data(realtime_dirs)
+                # Use the reader function to parse the bin files
+                realtime_data = read_specific_realtime_files(bin_files)
+                
+                # Store the parsed data in the class
+                for category, data in realtime_data.items():
+                    self.realtime_data[category] = data
+                    
+                # Print some info about what was loaded
+                for category, files in self.realtime_data.items():
+                    print(f"Found {len(files)} real-time files in {category}")
+                    for filename in files:
+                        print(f"Successfully loaded GTFS real-time: {filename}")
             except Exception as e:
-                print(f"Error creating sample data: {str(e)}")
-                # Fall back to JSON samples
-                self._create_sample_realtime_data(realtime_dirs)
+                print(f"Error reading GTFS-realtime files: {e}")
+        else:
+            # No bin files found, use the create_sample_files function which now notifies instead of creating
+            print("No existing GTFS-realtime bin files found.")
+            create_sample_files()  # This function now just prints a message
+            
+            # We won't call _create_sample_realtime_data since we're not creating samples anymore
         
         return self.realtime_data
     

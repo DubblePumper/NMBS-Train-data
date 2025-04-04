@@ -1,0 +1,2 @@
+[console_scripts]
+nmbs-data = nmbs_data.main:main
