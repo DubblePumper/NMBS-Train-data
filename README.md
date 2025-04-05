@@ -1,130 +1,128 @@
-# NMBS Train Data Analysis | Vibe Coding
+# NMBS Treingegevens Analyse | Vibe Coding
 
-A package for analyzing, visualizing, and exploring NMBS (Belgian Railways) train data, including schedule information and real-time updates.
+Een pakket voor het analyseren, visualiseren en verkennen van NMBS (Belgische Spoorwegen) treingegevens, inclusief dienstregelingen en realtime updates.
 
-## Project Structure
+## Projectstructuur
 
-The project has been structured as a proper Python package:
+Het project is gestructureerd als een volwaardig Python-pakket:
 
 ```
 nmbs-train-data/
 │
-├── requirements.txt        # Project dependencies
-├── setup.py               # Package configuration
-├── main.py                # Main entry point
+├── requirements.txt        # Projectafhankelijkheden
+├── setup.py                # Pakketconfiguratie
+├── main.py                 # Hoofdingangspunt
 │
-├── src/                   # Source code package
-│   └── nmbs_data/         # Main package
-│       ├── data/          # Data access layer
-│       ├── analysis/      # Analysis components
-│       ├── visualization/ # Visualization components
-│       └── webapp/        # Web application
+├── src/                    # Broncodepakket
+│   └── nmbs_data/          # Hoofdpakket
+│       ├── data/           # Gegevenstoegangslaag
+│       ├── analysis/       # Analysecomponenten
+│       ├── visualization/  # Visualisatiecomponenten
+│       └── webapp/         # Webapplicatie
 │
-├── data/                  # Data directory
-│   ├── Planningsgegevens/  # Planning data
-│   ├── Real-time_gegevens/ # Real-time data
-│   └── Maps/              # Generated maps
+├── docs/                   # Documentatie
 │
-├── docs/                  # Documentation
-│
-└── tests/                 # Test suite
+└── tests/                  # Testsuites
 ```
 
-## Installation
+## Installatie
 
-1. Clone the repository:
+1. Kloon de repository:
 ```bash
 git clone https://github.com/yourusername/NMBS-Train-data.git
 cd NMBS-Train-data
 ```
 
-2. Install the package and dependencies:
+2. Installeer het pakket en de afhankelijkheden:
 ```bash
 pip install -e .
 ```
 
-## Usage
+## Gebruik
 
-### Running Everything (Analysis, Visualization, and Web App)
+### Alles Uitvoeren (Analyse, Visualisatie en Web App)
 
 ```bash
 python main.py all
 ```
 
-You can also use the `--light` flag to use light mode for the visualization:
+Je kunt ook de `--light` vlag gebruiken voor een visualisatie in lichte modus:
 
 ```bash
 python main.py all --light
 ```
 
-### Running the Web Application
+### De Webapplicatie Uitvoeren
 
 ```bash
 python main.py webapp
 ```
 
-### Running the Data Analysis Only
+### Alleen de Gegevensanalyse Uitvoeren
 
 ```bash
 python main.py analyze
 ```
 
-### Generating a Map Visualization
+### Een Kaartvisualisatie Genereren
 
 ```bash
 python main.py visualize
 ```
 
-You can use the `--light` flag for a light-mode visualization:
+Je kunt de `--light` vlag gebruiken voor een visualisatie in lichte modus:
 
 ```bash
 python main.py visualize --light
 ```
 
-## Data Sources
+## Gegevensbronnen
 
-The application works with the following data sources:
+De applicatie werkt met de volgende gegevensbronnen:
 
-1. **Planning Data**: GTFS, NeTEx, and other schedule formats from NMBS/SNCB
-2. **Real-time Data**: GTFS-RT format data accessed via our API endpoint
+1. **Planningsgegevens**: GTFS, NeTEx en andere dienstregeling-formaten van NMBS/SNCB
+2. **Realtime gegevens**: GTFS-RT formaat gegevens via onze API-endpoint
 
-## Real-time Data Access
+## Realtime Gegevenstoegang
 
-This application connects to our dedicated API endpoint at `http://185.228.81.219:25580/api/data` to fetch the latest NMBS train data. The API service runs separately and provides real-time GTFS data, which this application then processes, analyzes, and visualizes.
+Deze applicatie maakt verbinding met onze speciale API-endpoint op `https://nmbsapi.sanderzijntestjes.be/api/` om de nieuwste NMBS-treingegevens op te halen. De API-service draait onafhankelijk en levert realtime GTFS-gegevens, die deze applicatie vervolgens verwerkt, analyseert en visualiseert.
 
-### Data Format
+### Gegevensformaat
 
-The API returns data in the standard GTFS Realtime format, containing information about:
-- Trip updates
-- Schedule changes
-- Platform information
-- Delay information
+De API levert gegevens in het standaard GTFS Realtime-formaat, met informatie over:
+- Ritwijzigingen
+- Dienstregeling-wijzigingen
+- Perroninformatie
+- Vertragingsinformatie
 
-## Development
+## Ontwikkeling
 
-### Running Tests
+### Tests Uitvoeren
 
 ```bash
 pytest tests/
 ```
 
-### Package Structure
+### Pakketstructuur
 
-- **data**: Handles data access via the API endpoint and manages file paths
-- **analysis**: Contains data processing and analysis logic
-- **visualization**: Manages map creation and visualizations
-- **webapp**: Contains the Dash web application components
+- **data**: Verzorgt gegevenstoegang via de API-endpoint en beheert bestandspaden
+- **analysis**: Bevat gegevensverwerking en analyselogica
+- **visualization**: Beheert kaartcreatie en visualisaties
+- **webapp**: Bevat de Dash webapplicatiecomponenten
 
-## Services
+## API Endpoints
 
-The application includes a service component that can be run to periodically fetch data from the API:
+De applicatie maakt gebruik van de volgende API endpoints:
 
-```bash
-python service.py
-```
+- `/api/health`: Controleert de status van de API
+- `/api/realtime/data`: Haalt de nieuwste realtime treingegevens op
+- `/api/planningdata/stops`: Haalt stationsinformatie op
+- `/api/planningdata/routes`: Haalt route-informatie op
+- `/api/planningdata/trips`: Haalt ritinformatie op
+- En meer...
 
-This will download data at regular intervals and store it for offline access.
+API onderdeel van: https://github.com/DubblePumper/NMBS-Train-data
 
-## License
+## Licentie
 
-[Specify your license here]
+Dit project is gelicenseerd onder de MIT-licentie - zie het LICENSE-bestand voor details.
