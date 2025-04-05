@@ -1,4 +1,4 @@
-# NMBS Train Data Analysis
+# NMBS Train Data Analysis | Vibe Coding
 
 A package for analyzing, visualizing, and exploring NMBS (Belgian Railways) train data, including schedule information and real-time updates.
 
