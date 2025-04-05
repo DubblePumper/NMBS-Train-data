@@ -18,6 +18,7 @@ beautifulsoup4>=4.10.0
 requests>=2.27.0
 python-dotenv>=1.0.0
 cloudscraper>=1.2.71
+schedule>=1.1.0
 
 # Testing (optional)
 pytest>=6.0.0
