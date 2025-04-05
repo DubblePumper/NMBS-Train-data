@@ -4,7 +4,7 @@ A package for analyzing, visualizing, and exploring NMBS (Belgian Railways) trai
 
 ## Project Structure
 
-The project has been restructured as a proper Python package:
+The project has been structured as a proper Python package:
 
 ```
 nmbs-train-data/
@@ -34,7 +34,7 @@ nmbs-train-data/
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/yourusername/NMBS-Train-data.git
 cd NMBS-Train-data
 ```
 
@@ -86,7 +86,19 @@ python main.py visualize --light
 The application works with the following data sources:
 
 1. **Planning Data**: GTFS, NeTEx, and other schedule formats from NMBS/SNCB
-2. **Real-time Data**: GTFS-RT format data with and without platform changes
+2. **Real-time Data**: GTFS-RT format data accessed via our API endpoint
+
+## Real-time Data Access
+
+This application connects to our dedicated API endpoint at `http://185.228.81.219:25580/api/data` to fetch the latest NMBS train data. The API service runs separately and provides real-time GTFS data, which this application then processes, analyzes, and visualizes.
+
+### Data Format
+
+The API returns data in the standard GTFS Realtime format, containing information about:
+- Trip updates
+- Schedule changes
+- Platform information
+- Delay information
 
 ## Development
 
@@ -98,10 +110,20 @@ pytest tests/
 
 ### Package Structure
 
-- **data**: Handles data access and file paths
+- **data**: Handles data access via the API endpoint and manages file paths
 - **analysis**: Contains data processing and analysis logic
 - **visualization**: Manages map creation and visualizations
 - **webapp**: Contains the Dash web application components
+
+## Services
+
+The application includes a service component that can be run to periodically fetch data from the API:
+
+```bash
+python service.py
+```
+
+This will download data at regular intervals and store it for offline access.
 
 ## License
 
