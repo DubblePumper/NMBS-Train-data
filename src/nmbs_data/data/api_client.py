@@ -9,6 +9,7 @@ import pandas as pd
 from datetime import datetime
 import os
 import time
+import threading
 from urllib.parse import urljoin
 import logging
 
@@ -253,3 +254,67 @@ class NMBSApiClient:
 
 # Create a singleton instance
 api_client = NMBSApiClient(cache_dir=os.path.join(os.path.dirname(__file__), "cache"))
+
+# Module-level functions for easy access to the API
+
+def get_realtime_data():
+    """
+    Get the latest real-time NMBS train data with track changes.
+    
+    Returns:
+        dict: The GTFS real-time data as a dictionary
+    """
+    return api_client.get_realtime_data()
+
+def get_planning_files_list():
+    """
+    Get a list of available planning data files.
+    
+    Returns:
+        list: A list of filenames
+    """
+    files_response = api_client.get_planning_data_files()
+    return files_response.get('files', [])
+
+def get_planning_file(filename):
+    """
+    Get a specific planning data file.
+    
+    Args:
+        filename (str): The name of the file to get
+        
+    Returns:
+        dict or list: The file contents
+    """
+    return api_client.get_planning_file(filename)
+
+def force_update():
+    """
+    Force an immediate update of all data.
+    
+    Returns:
+        bool: True if successful
+    """
+    try:
+        response = api_client.update_data()
+        return response.get('status') == 'success'
+    except Exception:
+        return False
+
+def start_data_service(interval=30, scrape_interval=86400):
+    """
+    Start the data service in the background. This will:
+    1. Do an initial scrape of the website if needed
+    2. Download the latest data files
+    3. Continue running in the background to update the data periodically
+    
+    Args:
+        interval (int): Interval in seconds between data downloads
+        scrape_interval (int): Interval in seconds between website scraping
+        
+    Returns:
+        threading.Thread: A background thread running the service
+    """
+    from nmbs_data.data.data_service import NMBSDataService
+    service = NMBSDataService()
+    return service.start_background_service(interval, scrape_interval)

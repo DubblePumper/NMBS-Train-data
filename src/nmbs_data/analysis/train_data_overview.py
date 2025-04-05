@@ -277,3 +277,178 @@ class TrainDataAnalyzer:
         overview["realtime_stats"] = self._generate_realtime_stats()
         
         return overview
+
+    def _count_planning_files(self):
+        """Count the number of planning files available"""
+        # When using the API, we count the number of GTFS files loaded
+        if hasattr(self, 'planning_data') and self.planning_data:
+            return sum(len(category) for category in self.planning_data.values())
+        return 0
+            
+    def _generate_gtfs_stats(self):
+        """Generate statistics for GTFS data"""
+        stats = {}
+        
+        # When using API data, we can still generate statistics
+        if 'gtfs' in self.planning_data and self.planning_data['gtfs']:
+            try:
+                # Get the stops data
+                if 'stops.txt' in self.planning_data['gtfs']:
+                    stops_df = self.planning_data['gtfs']['stops.txt']
+                    stats['stops_count'] = len(stops_df)
+                
+                # Get the routes data
+                if 'routes.txt' in self.planning_data['gtfs']:
+                    routes_df = self.planning_data['gtfs']['routes.txt']
+                    stats['routes_count'] = len(routes_df)
+                    
+                    # Count routes by type if route_type column exists
+                    if 'route_type' in routes_df.columns:
+                        route_types = routes_df['route_type'].value_counts().to_dict()
+                        stats['routes_by_type'] = route_types
+                
+                # Get the trips data
+                if 'trips.txt' in self.planning_data['gtfs']:
+                    trips_df = self.planning_data['gtfs']['trips.txt']
+                    stats['trips_count'] = len(trips_df)
+                
+                # Get the stop_times data
+                if 'stop_times.txt' in self.planning_data['gtfs']:
+                    stop_times_df = self.planning_data['gtfs']['stop_times.txt']
+                    stats['stop_times_count'] = len(stop_times_df)
+                
+            except Exception as e:
+                print(f"Error generating GTFS statistics: {str(e)}")
+                stats['error'] = str(e)
+        
+        return stats
+    
+    def _generate_netex_stats(self):
+        """Generate statistics for NeTEx data"""
+        # When using API, NeTEx data might not be available
+        return {"api_available": False}
+    
+    def _generate_rawdata_stats(self):
+        """Generate statistics for raw data"""
+        # When using API, raw data might not be available
+        return {"api_available": False}
+    
+    def _generate_realtime_stats(self):
+        """Generate statistics for real-time data"""
+        stats = {}
+        
+        if not self.realtime_data:
+            return {"error": "No real-time data available"}
+        
+        try:
+            # Count entities with platform changes
+            with_changes_count = 0
+            if 'with_platform_changes' in self.realtime_data:
+                with_platform_changes = self.realtime_data['with_platform_changes']
+                
+                if 'processed_api_data' in with_platform_changes:
+                    if 'entities' in with_platform_changes['processed_api_data'].columns:
+                        with_changes_count = len(with_platform_changes['processed_api_data']['entities'].iloc[0])
+                
+            stats['with_platform_changes_count'] = with_changes_count
+            
+            # Count entities without platform changes
+            without_changes_count = 0
+            if 'without_platform_changes' in self.realtime_data:
+                without_platform_changes = self.realtime_data['without_platform_changes']
+                
+                if 'processed_api_data' in without_platform_changes:
+                    if 'entities' in without_platform_changes['processed_api_data'].columns:
+                        without_changes_count = len(without_platform_changes['processed_api_data']['entities'].iloc[0])
+            
+            stats['without_platform_changes_count'] = without_changes_count
+            
+            # Calculate percentages
+            total_entities = with_changes_count + without_changes_count
+            if total_entities > 0:
+                stats['with_platform_changes_percent'] = (with_changes_count / total_entities) * 100
+                stats['without_platform_changes_percent'] = (without_changes_count / total_entities) * 100
+            else:
+                stats['with_platform_changes_percent'] = 0
+                stats['without_platform_changes_percent'] = 0
+            
+            # Add timestamp
+            stats['generated_at'] = datetime.now().isoformat()
+            
+        except Exception as e:
+            print(f"Error generating real-time statistics: {str(e)}")
+            stats['error'] = str(e)
+        
+        return stats
+
+def main():
+    """Main function to run train data analysis."""
+    print("Starting train data analysis...")
+    
+    # Create analyzer
+    analyzer = TrainDataAnalyzer()
+    
+    # Load planning data
+    print("\nLoading planning data...")
+    analyzer.load_planning_data()
+    
+    # Load real-time data
+    print("\nLoading real-time data...")
+    analyzer.load_realtime_data()
+    
+    # Generate overview
+    print("\nGenerating data overview...")
+    overview = analyzer.generate_overview()
+    
+    # Create output directories if they don't exist
+    paths = ensure_directories()
+    output_dir = paths['output_dir']
+    
+    # Save overview as JSON
+    print("\nSaving overview to JSON...")
+    overview_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "train_data_overview.json")
+    with open(overview_path, 'w') as f:
+        json.dump(overview, f, indent=2)
+    
+    # Create a summary text file
+    print("\nCreating summary text file...")
+    summary_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "train_data_overview_summary.txt")
+    with open(summary_path, 'w') as f:
+        f.write("NMBS Train Data Overview\n")
+        f.write("======================\n\n")
+        f.write(f"Generated at: {overview['metadata']['generated_at']}\n\n")
+        
+        f.write("Planning Data:\n")
+        f.write(f"  - Total files: {overview['planning_data']['total_files']}\n")
+        f.write(f"  - GTFS files: {overview['planning_data']['gtfs_files']}\n")
+        f.write(f"  - NeTEx files: {overview['planning_data']['netex_files']}\n")
+        f.write(f"  - EDIFACT files: {overview['planning_data']['edifact_files']}\n")
+        f.write(f"  - Raw data files: {overview['planning_data']['rawdata_files']}\n\n")
+        
+        f.write("Real-time Data:\n")
+        f.write(f"  - With platform changes: {overview['realtime_data']['with_platform_changes']}\n")
+        f.write(f"  - Without platform changes: {overview['realtime_data']['without_platform_changes']}\n\n")
+        
+        # Add GTFS statistics if available
+        if 'gtfs_stats' in overview:
+            f.write("GTFS Statistics:\n")
+            for key, value in overview['gtfs_stats'].items():
+                f.write(f"  - {key}: {value}\n")
+            f.write("\n")
+        
+        # Add real-time statistics if available
+        if 'realtime_stats' in overview:
+            f.write("Real-time Statistics:\n")
+            for key, value in overview['realtime_stats'].items():
+                if key != 'error' and key != 'generated_at':
+                    f.write(f"  - {key}: {value}\n")
+            f.write("\n")
+    
+    print(f"\nAnalysis complete. Overview saved to {overview_path}")
+    print(f"Summary saved to {summary_path}")
+    
+    # Return the overview as a result
+    return overview
+
+if __name__ == "__main__":
+    main()

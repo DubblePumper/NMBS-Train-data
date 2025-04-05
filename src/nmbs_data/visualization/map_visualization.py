@@ -48,13 +48,13 @@ def extract_gtfs_data(gtfs_file=None):
     
     # If API fails, fallback to local file if provided
     paths = get_data_paths()
-    PLANNING_DIR = paths['PLANNING_DIR']
+    planning_dir = paths['planning_dir']  # Use lowercase key
     
     if gtfs_file is None:
         # Find first GTFS file in planning directory
-        for file in os.listdir(PLANNING_DIR):
+        for file in os.listdir(planning_dir):
             if file.endswith('.zip') and 'GTFS' in file:
-                gtfs_file = os.path.join(PLANNING_DIR, file)
+                gtfs_file = os.path.join(planning_dir, file)
                 print(f"Using GTFS file: {gtfs_file}")
                 break
     
@@ -128,7 +128,7 @@ def load_station_data(file_path=None):
     # If API fails, fallback to local file
     if not file_path:
         paths = get_data_paths()
-        PLANNING_DIR = paths['PLANNING_DIR']
+        planning_dir = paths['planning_dir']  # Use lowercase key
         
         # Try to extract from GTFS file
         stops_df, _, _, _ = extract_gtfs_data(file_path)
@@ -145,8 +145,8 @@ def load_station_data(file_path=None):
         
         # Try other potential files
         potential_files = [
-            os.path.join(PLANNING_DIR, "stations.csv"),
-            os.path.join(PLANNING_DIR, "stations.json")
+            os.path.join(planning_dir, "stations.csv"),
+            os.path.join(planning_dir, "stations.json")
         ]
         for path in potential_files:
             if os.path.exists(path):
@@ -222,7 +222,8 @@ def load_route_data(file_path=None):
     
     # If API doesn't work, try to construct routes from local GTFS
     paths = get_data_paths()
-    PLANNING_DIR = paths['PLANNING_DIR']
+    # Use planning_dir instead of PLANNING_DIR to match the updated structure
+    planning_dir = paths['planning_dir']
     
     # Try to construct routes from GTFS
     stops_df, routes_df, trips_df, stop_times_df = extract_gtfs_data(file_path)
@@ -236,7 +237,7 @@ def load_route_data(file_path=None):
     
     # If not GTFS or GTFS processing failed, try other formats
     if file_path is None:
-        file_path = os.path.join(PLANNING_DIR, "routes.csv")
+        file_path = os.path.join(planning_dir, "routes.csv")
     
     try:
         # Attempt to load route data based on file extension
@@ -290,7 +291,7 @@ def visualize_train_routes(gtfs_file=None, routes_file=None, stations_file=None,
     """
     # Get paths from data_paths module
     paths = get_data_paths()
-    MAPS_DIR = paths['MAPS_DIR']
+    maps_dir = paths['MAPS_DIR']  # Use uppercase key to match what's returned by ensure_directories()
     
     # Ensure directories exist
     ensure_directories()
@@ -298,7 +299,7 @@ def visualize_train_routes(gtfs_file=None, routes_file=None, stations_file=None,
     # Set default output file if not provided
     if output_file is None:
         output_file = "train_routes_map.html"
-    output_path = os.path.join(MAPS_DIR, output_file)
+    output_path = os.path.join(maps_dir, output_file)
     
     # Load station and route data from API by default
     print("Loading station and route data...")

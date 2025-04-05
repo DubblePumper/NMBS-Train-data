@@ -1,22 +1,26 @@
 {
   "planning_data": {
-    "total_files": "0",
-    "gtfs_files": "0",
-    "netex_files": "0",
-    "edifact_files": "0",
-    "rawdata_files": "0"
+    "total_files": 0,
+    "gtfs_files": 0,
+    "netex_files": 0,
+    "edifact_files": 0,
+    "rawdata_files": 0
   },
   "realtime_data": {
-    "with_platform_changes": "0",
-    "without_platform_changes": "0"
-  },
-  "realtime_stats": {
-    "with_platform_changes": "{}",
-    "without_platform_changes": "{}"
+    "with_platform_changes": 1,
+    "without_platform_changes": 1
   },
   "metadata": {
-    "generated_at": "2025-04-05 16:53:49.231844",
-    "planning_dir": "C:\\Users\\sande\\Documents\\GitHub\\NMBS-Train-data\\data\\Planningsgegevens",
-    "realtime_dir": "C:\\Users\\sande\\Documents\\GitHub\\NMBS-Train-data\\data\\Real-time_gegevens"
+    "generated_at": "2025-04-05T21:32:54.831299",
+    "planning_dir": "C:\\Users\\sande\\Documents\\GitHub\\NMBS-Train-data\\reports",
+    "realtime_dir": "C:\\Users\\sande\\Documents\\GitHub\\NMBS-Train-data\\reports\\realtime",
+    "data_source": "API"
+  },
+  "realtime_stats": {
+    "with_platform_changes_count": 0,
+    "without_platform_changes_count": 323,
+    "with_platform_changes_percent": 0.0,
+    "without_platform_changes_percent": 100.0,
+    "generated_at": "2025-04-05T21:32:54.831580"
   }
 }
