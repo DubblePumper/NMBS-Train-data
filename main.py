@@ -28,12 +28,16 @@ def run_visualization(dark_mode=True):
     print(f"Map generated at: {output_path}")
     return output_path
 
-def run_webapp():
-    """Run the web application"""
+def run_webapp(use_reloader=True):
+    """Run the web application
+    
+    Args:
+        use_reloader: Whether to use Flask's automatic reloader. Set to False when running the full workflow.
+    """
     # Import here to avoid loading Dash unnecessarily if not running the webapp
     from nmbs_data.webapp.app import app
-    # Do not edit this
-    app.run(debug=True)
+    # Run the app with the specified reloader setting
+    app.run(debug=True, use_reloader=use_reloader)
 
 def run_all(light_mode=False):
     """Run analysis, generate visualization, and start the web application"""
@@ -50,7 +54,7 @@ def run_all(light_mode=False):
     
     # Step 3: Start the web application
     print("\n=== Step 3: Starting web application ===")
-    run_webapp()
+    run_webapp(use_reloader=False)
     
     return {
         "analysis_complete": True,

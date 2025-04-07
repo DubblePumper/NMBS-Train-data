@@ -18,7 +18,7 @@ import shutil
 
 # Update imports to use new package structure
 from nmbs_data.data.data_paths import ensure_directories, get_realtime_dirs, clean_realtime_dirs
-from nmbs_data.data.gtfs_realtime_reader import read_specific_realtime_files, create_sample_files
+from nmbs_data.data.gtfs_realtime_reader import read_specific_realtime_files
 from nmbs_data.data.api_client import api_client
 
 class TrainDataAnalyzer:
@@ -150,14 +150,7 @@ class TrainDataAnalyzer:
                 
         except Exception as e:
             print(f"Error loading real-time data from API: {str(e)}")
-            
-            # If the API fails, try to create sample data instead
-            try:
-                realtime_dirs = get_realtime_dirs()
-                self._create_sample_realtime_data(realtime_dirs)
-                print("Created sample real-time data as fallback")
-            except Exception as e:
-                print(f"Error creating sample data: {str(e)}")
+            # We only use the API - no fallback to sample data
         
         return self.realtime_data
         
@@ -223,10 +216,6 @@ class TrainDataAnalyzer:
         
     def _process_netex_xml(self, xml_path):
         """Process Netex XML file"""
-        # ... existing code ...
-        
-    def _create_sample_realtime_data(self, realtime_dirs):
-        """Create sample real-time data files for demonstration"""
         # ... existing code ...
         
     def _process_realtime_xml(self, xml_path):

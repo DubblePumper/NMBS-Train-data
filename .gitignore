@@ -3,3 +3,8 @@
 cookies.json
 __pycache__/
 *.pyc
+src/nmbs_data/data/cache/
+src/nmbs_data/analysis/
+src/nmbs_data/__pycache__/
+**/pycache/
+

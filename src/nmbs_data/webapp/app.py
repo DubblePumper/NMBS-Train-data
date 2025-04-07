@@ -44,14 +44,27 @@ dark_template = go.layout.Template(
 # Load overview data
 def get_overview_data():
     try:
-        overview_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'train_data_overview.json')
+        # Use the correct project root path for the overview file
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        overview_path = os.path.join(project_root, 'train_data_overview.json')
         with open(overview_path, 'r') as f:
             overview_data = json.load(f)
+            print(f"Loaded overview data from {overview_path}")
     except FileNotFoundError:
         # Generate new overview if file doesn't exist
+        print(f"Overview file not found, generating new one")
         analyzer = TrainDataAnalyzer()
         overview_data = analyzer.generate_overview()
-        analyzer.save_overview(overview_data)
+        
+        # Save the overview using our own code since this might be called 
+        # before the save_overview method is available
+        try:
+            with open(overview_path, 'w') as f:
+                json.dump(overview_data, f, indent=2)
+                print(f"Saved overview to {overview_path}")
+        except Exception as e:
+            print(f"Error saving overview: {str(e)}")
+            
     return overview_data
 
 # Initialize overview data
@@ -78,12 +91,35 @@ def get_gtfs_data():
         # Parse string representation if needed
         file_stats = parse_string_dict(file_stats)
         
-        if file_stats.get('total_records', 0) > 0:
-            tables_data = file_stats.get('tables', {})
-            # Return actual counts for visualization
+        # Check if file_stats is a dictionary before trying to use .get()
+        if isinstance(file_stats, dict):
+            if file_stats.get('total_records', 0) > 0:
+                tables_data = file_stats.get('tables', {})
+                # Return actual counts for visualization
+                return {
+                    'category': [table.replace('.txt', '') for table in tables_data.keys()],
+                    'count': [info.get('record_count', 0) for info in tables_data.values()]
+                }
+        elif isinstance(file_stats, (int, float)) and file_stats > 0:
+            # If file_stats is a numeric value, create a simple visualization
             return {
-                'category': [table.replace('.txt', '') for table in tables_data.keys()],
-                'count': [info.get('record_count', 0) for info in tables_data.values()]
+                'category': [file_name.replace('.txt', '')],
+                'count': [file_stats]
+            }
+    
+    # If we get data in the format like stops_count, routes_count directly in gtfs_stats
+    if any(key.endswith('_count') for key in gtfs_stats.keys()):
+        categories = []
+        counts = []
+        for key, value in gtfs_stats.items():
+            if key.endswith('_count') and isinstance(value, (int, float)):
+                categories.append(key.replace('_count', ''))
+                counts.append(value)
+        
+        if categories:
+            return {
+                'category': categories,
+                'count': counts
             }
     
     return None
@@ -185,11 +221,7 @@ app.layout = html.Div([
             html.Div([
                 html.H2("Real-time Data Monitoring"),
                 html.Div([
-                    html.P("Monitor real-time data from NMBS by checking the following directories:"),
-                    html.Ul([
-                        html.Li("With platform changes: data/Real-time_gegevens/real-time_gegevens_met_info_over_spoorveranderingen"),
-                        html.Li("Without platform changes: data/Real-time_gegevens/real-time_gegevens_zonder_info_over_spoorveranderingen")
-                    ]),
+                    html.P("Monitor real-time data from NMBS API service"),
                     
                     html.H3("How to Use Real-time Data"),
                     html.P("GTFS Realtime is an extension to GTFS that provides real-time updates about:"),
@@ -198,10 +230,6 @@ app.layout = html.Div([
                         html.Li("Service alerts (station/stop closures, important notifications)"),
                         html.Li("Vehicle positions (where vehicles are located in real time)")
                     ]),
-                    
-                    html.H3("Sample Real-time Data"),
-                    html.P("Sample files have been created to demonstrate the real-time data structure."),
-                    html.P("These samples show the format of train delay and platform change information."),
                     
                     html.Button("Update Data", id="update-button", n_clicks=0),
                     html.Div(id='update-status')
@@ -423,16 +451,20 @@ def update_details(data_type):
                 # Parse string representation of dictionaries if needed
                 file_stats = parse_string_dict(file_stats)
                 
-                # Now safely access dictionary attributes
-                total_records = file_stats.get('total_records', 0)
-                tables = file_stats.get('tables', {})
-                
-                details.append(html.P(f"Total records: {total_records}"))
-                
-                for table_name, table_info in tables.items():
-                    details.append(html.H5(table_name))
-                    details.append(html.P(f"Records: {table_info.get('record_count', 0)}"))
-                    details.append(html.P(f"Columns: {', '.join(table_info.get('columns', []))}"))
+                # Check if file_stats is a dictionary before accessing it
+                if isinstance(file_stats, dict):
+                    total_records = file_stats.get('total_records', 0)
+                    tables = file_stats.get('tables', {})
+                    
+                    details.append(html.P(f"Total records: {total_records}"))
+                    
+                    for table_name, table_info in tables.items():
+                        details.append(html.H5(table_name))
+                        details.append(html.P(f"Records: {table_info.get('record_count', 0)}"))
+                        details.append(html.P(f"Columns: {', '.join(table_info.get('columns', []))}"))
+                elif isinstance(file_stats, (int, float)):
+                    # Handle simple numeric values
+                    details.append(html.P(f"Count: {file_stats}"))
                 
                 details.append(html.Hr())
                 
@@ -509,9 +541,8 @@ def update_details(data_type):
                             details.append(html.Hr())
             
             if not details:
-                details.append(html.P("No real-time files found or sample data not loaded yet."))
-                details.append(html.P("Update the data to generate sample real-time data for demonstration."))
-                details.append(html.Button("Generate Sample Data", id='generate-samples-button', n_clicks=0))
+                details.append(html.P("No real-time data available from API."))
+                details.append(html.P("Click the 'Update Data' button on the Real-time Monitor tab to fetch the latest data."))
                         
             return details
         return html.P("No real-time data details available")
@@ -520,34 +551,36 @@ def update_details(data_type):
 
 @app.callback(
     Output('update-status', 'children'),
-    [Input('update-button', 'n_clicks'),
-     Input('generate-samples-button', 'n_clicks')] if 'generate-samples-button' in app.layout else [Input('update-button', 'n_clicks')]
+    Input('update-button', 'n_clicks')
 )
-def update_data(update_clicks, sample_clicks=0):
-    ctx = callback_context
-    button_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
+def update_data(update_clicks):
+    if update_clicks is None or update_clicks == 0:
+        return ""
     
-    if ctx.triggered:
-        try:
-            analyzer = TrainDataAnalyzer()
-            analyzer.load_planning_data()
-            analyzer.load_realtime_data()
-            new_overview = analyzer.generate_overview()
-            analyzer.save_overview(new_overview)
-            
-            # Update the global overview_data
-            global overview_data
-            overview_data = new_overview
-            
-            action = "updated" if button_id == 'update-button' else "generated sample data and updated"
-            
-            return html.Div([
-                html.P(f"Data {action} successfully!", style={"color": "green"}),
-                html.P(f"Last update: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            ])
-        except Exception as e:
-            return html.Div(f"Error updating data: {str(e)}", style={"color": "red"})
-    return ""
+    try:
+        analyzer = TrainDataAnalyzer()
+        analyzer.load_planning_data()
+        analyzer.load_realtime_data()
+        new_overview = analyzer.generate_overview()
+        
+        # Save the overview directly
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        overview_path = os.path.join(project_root, 'train_data_overview.json')
+        
+        with open(overview_path, 'w') as f:
+            json.dump(new_overview, f, indent=2)
+            print(f"Updated overview saved to {overview_path}")
+        
+        # Update the global overview_data
+        global overview_data
+        overview_data = new_overview
+        
+        return html.Div([
+            html.P("Data updated successfully!", style={"color": "green"}),
+            html.P(f"Last update: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        ])
+    except Exception as e:
+        return html.Div(f"Error updating data: {str(e)}", style={"color": "red"})
 
 @app.callback(
     [Output('map-iframe', 'src'),
