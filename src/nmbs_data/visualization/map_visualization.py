@@ -7,12 +7,18 @@ import pandas as pd
 import json
 import folium
 import zipfile
+import time
+import threading
+import datetime
+import logging
+import requests
+import numpy as np
+from typing import Dict, List, Tuple, Optional, Any
 from folium.plugins import MarkerCluster, FeatureGroupSubGroup
 import colorsys
-# Update imports to use the new package structure
-from nmbs_data.data.data_paths import ensure_directories, get_realtime_dirs
+from nmbs_data.data.data_paths import ensure_directories, get_realtime_dirs, get_data_filepath
 from nmbs_data.data.gtfs_realtime_reader import read_specific_realtime_files, extract_vehicle_positions
-from nmbs_data.data.api_client import api_client
+from nmbs_data.data.api_client import api_client, get_realtime_data
 
 # Get paths from data_paths module
 def get_data_paths():
@@ -20,620 +26,822 @@ def get_data_paths():
     paths = ensure_directories()
     return paths
 
-def extract_gtfs_data(gtfs_file=None):
+def load_station_data() -> Dict[str, Dict[str, Any]]:
     """
-    Extract station and route data from GTFS files or API.
+    Load station data from the API.
     
-    Args:
-        gtfs_file: Path to the GTFS zip file (optional if using API)
-        
     Returns:
-        tuple: (stations_df, routes_df, trips_df, stop_times_df)
+        Dict[str, Dict[str, Any]]: Dictionary of station data with station_id as key
     """
-    # First try to use the API
-    try:
-        print("Extracting GTFS data from API...")
-        stops_df = api_client.get_stops_df()
-        routes_df = api_client.get_routes_df()
-        trips_df = api_client.get_trips_df()
-        stop_times_df = api_client.get_stop_times_df()
-        
-        if not all([len(df) > 0 for df in [stops_df, routes_df, trips_df, stop_times_df]]):
-            print("Some GTFS data from API was empty, checking for local files...")
-        else:
-            print(f"Successfully loaded GTFS data from API: {len(stops_df)} stops, {len(routes_df)} routes, {len(trips_df)} trips")
-            return stops_df, routes_df, trips_df, stop_times_df
-    except Exception as e:
-        print(f"Error loading GTFS data from API: {e}")
-    
-    # If API fails, fallback to local file if provided
-    paths = get_data_paths()
-    planning_dir = paths['planning_dir']  # Use lowercase key
-    
-    if gtfs_file is None:
-        # Find first GTFS file in planning directory
-        for file in os.listdir(planning_dir):
-            if file.endswith('.zip') and 'GTFS' in file:
-                gtfs_file = os.path.join(planning_dir, file)
-                print(f"Using GTFS file: {gtfs_file}")
-                break
-    
-    if not gtfs_file or not os.path.exists(gtfs_file):
-        print("No GTFS file found")
-        return None, None, None, None
+    stations = {}
     
     try:
-        # Extract data from GTFS zip file
-        with zipfile.ZipFile(gtfs_file, 'r') as zip_ref:
-            # Check for required files
-            required_files = ['stops.txt', 'routes.txt', 'trips.txt', 'stop_times.txt']
-            missing_files = [f for f in required_files if f not in zip_ref.namelist()]
-            
-            if missing_files:
-                print(f"Warning: Missing required GTFS files: {', '.join(missing_files)}")
-                return None, None, None, None
-            
-            # Extract data
-            stops_df = pd.read_csv(zip_ref.open('stops.txt'))
-            routes_df = pd.read_csv(zip_ref.open('routes.txt'))
-            trips_df = pd.read_csv(zip_ref.open('trips.txt'))
-            stop_times_df = pd.read_csv(zip_ref.open('stop_times.txt'))
-            
-            return stops_df, routes_df, trips_df, stop_times_df
-    
-    except Exception as e:
-        print(f"Error extracting GTFS data: {e}")
-        return None, None, None, None
-
-def load_station_data(file_path=None):
-    """
-    Load train station data with coordinates and additional details like name and platform.
-    
-    Args:
-        file_path: Path to the station data file or GTFS file (optional if using API)
+        # Get stops data from API
+        stops_data = api_client.get_stops()
+        logging.info(f"Loaded {len(stops_data)} stops from API")
         
-    Returns:
-        dict: Dictionary mapping station IDs to details including coordinates, name and platform
-    """
-    station_data = {}
-    
-    # First try to use the API
-    try:
-        stops_df = api_client.get_stops_df()
-        if len(stops_df) > 0:
-            print(f"Using API for station data: {len(stops_df)} stations")
-            
-            # Try different column name variations
-            lat_cols = ['stop_lat', 'latitude', 'lat', 'y', 'stop_latitude']
-            lon_cols = ['stop_lon', 'longitude', 'lon', 'x', 'stop_longitude']
-            id_cols = ['stop_id', 'station_id', 'id', 'code']
-            name_cols = ['stop_name', 'name', 'station_name']
-            platform_cols = ['platform_code', 'platform', 'platformCode']
-            
-            found_lat = next((col for col in lat_cols if col in stops_df.columns), None)
-            found_lon = next((col for col in lon_cols if col in stops_df.columns), None)
-            found_id = next((col for col in id_cols if col in stops_df.columns), None)
-            found_name = next((col for col in name_cols if col in stops_df.columns), None)
-            found_platform = next((col for col in platform_cols if col in stops_df.columns), None)
-            
-            if found_lat and found_lon and found_id:
-                for _, row in stops_df.iterrows():
-                    station_id = str(row[found_id])
-                    lat = row[found_lat]
-                    lon = row[found_lon]
-                    
-                    # Get station name if available
-                    station_name = ""
-                    if found_name and pd.notna(row[found_name]):
-                        station_name = row[found_name]
-                        
-                    # Get platform number if available
-                    platform = ""
-                    if found_platform and pd.notna(row[found_platform]):
-                        platform = row[found_platform]
-                        
-                    if pd.notna(lat) and pd.notna(lon):
-                        station_data[station_id] = {
-                            'coords': [lat, lon],
-                            'name': station_name,
-                            'platform': platform
-                        }
-                
-                print(f"Loaded {len(station_data)} station details from API")
-                return station_data
-    except Exception as e:
-        print(f"Error loading station data from API: {e}")
-    
-    # If API fails, fallback to local file with basic information
-    if not file_path:
-        paths = get_data_paths()
-        planning_dir = paths['planning_dir']
-        
-        # Try to extract from GTFS file
-        stops_df, _, _, _ = extract_gtfs_data(file_path)
-        if stops_df is not None and 'stop_lat' in stops_df.columns and 'stop_lon' in stops_df.columns:
-            for _, row in stops_df.iterrows():
-                station_id = str(row['stop_id'])
-                lat = row['stop_lat']
-                lon = row['stop_lon']
-                
-                # Try to get station name if available
-                station_name = ""
-                if 'stop_name' in stops_df.columns and pd.notna(row['stop_name']):
-                    station_name = row['stop_name']
-                    
-                # Try to get platform if available
-                platform = ""
-                if 'platform_code' in stops_df.columns and pd.notna(row['platform_code']):
-                    platform = row['platform_code']
-                
-                if pd.notna(lat) and pd.notna(lon):
-                    station_data[station_id] = {
-                        'coords': [lat, lon],
-                        'name': station_name,
-                        'platform': platform
-                    }
-            
-            print(f"Loaded {len(station_data)} station details from GTFS file")
-            return station_data
-        
-        # Try other potential files
-        potential_files = [
-            os.path.join(planning_dir, "stations.csv"),
-            os.path.join(planning_dir, "stations.json")
-        ]
-        for path in potential_files:
-            if os.path.exists(path):
-                file_path = path
-                break
-    
-    # If no station data found, use some default Belgian stations
-    if not station_data:
-        print("No station data found. Using default Belgian station coordinates.")
-        station_data = {
-            "8814001": {
-                'coords': [50.8358, 4.3353],
-                'name': "Bruxelles-Midi/Brussel-Zuid",
-                'platform': ""
-            },
-            "8821006": {
-                'coords': [51.2172, 4.4212],
-                'name': "Antwerpen-Centraal",
-                'platform': ""
-            },
-            "8891009": {
-                'coords': [51.0352, 3.7094],
-                'name': "Gent-Sint-Pieters",
-                'platform': ""
-            },
-            "8844008": {
-                'coords': [50.6404, 5.5715],
-                'name': "Liège-Guillemins",
-                'platform': ""
-            },
-            "8892007": {
-                'coords': [51.2060, 3.2161],
-                'name': "Bruges",
-                'platform': ""
-            },
-            "8841004": {
-                'coords': [50.6326, 5.5651],
-                'name': "Namur",
-                'platform': ""
-            },
-            "8863008": {
-                'coords': [50.4591, 3.9561],
-                'name': "Mons",
-                'platform': ""
-            },
-            "8844305": {
-                'coords': [50.4238, 4.4700],
-                'name': "Charleroi-Sud",
-                'platform': ""
-            }
-        }
-    
-    return station_data
-
-def get_route_color(route_index, total_routes, route_type=None):
-    """Generate a color for a route based on its index and type."""
-    # Use different hue ranges based on route type
-    if route_type is not None:
-        # Map route types to different hue ranges
-        type_hue_ranges = {
-            0: (0.0, 0.1),    # Tram
-            1: (0.1, 0.2),    # Subway/Metro
-            2: (0.2, 0.5),    # Rail
-            3: (0.5, 0.7),    # Bus
-            4: (0.7, 0.8),    # Ferry
-            5: (0.8, 0.9),    # Cable car
-            6: (0.9, 1.0)     # Gondola/Suspended cable car
-        }
-        
-        # Default to rail if type not in mapping
-        hue_range = type_hue_ranges.get(route_type, (0.2, 0.5))
-        
-        # Calculate hue within the type's range
-        hue = hue_range[0] + (route_index / max(1, total_routes)) * (hue_range[1] - hue_range[0])
-    else:
-        # Distribute hues evenly across the spectrum if no type info
-        hue = route_index / max(1, total_routes)
-    
-    # Create a vibrant RGB color
-    r, g, b = [int(255 * c) for c in colorsys.hsv_to_rgb(hue, 0.8, 0.9)]
-    return f'#{r:02x}{g:02x}{b:02x}'
-
-def construct_routes_from_gtfs(trips_df, stop_times_df, routes_df):
-    """
-    Construct routes from GTFS data.
-    
-    Args:
-        trips_df: DataFrame with trips data
-        stop_times_df: DataFrame with stop times data
-        routes_df: DataFrame with routes data
-        
-    Returns:
-        list: List of routes, each containing sequence of station IDs
-    """
-    routes = []
-    
-    try:
-        # Verify we have required columns
-        required_trip_cols = ['trip_id', 'route_id', 'service_id']
-        required_stop_time_cols = ['trip_id', 'stop_id', 'stop_sequence']
-        required_route_cols = ['route_id', 'route_type']
-        
-        # Check if required columns exist in dataframes
-        if not all(col in trips_df.columns for col in required_trip_cols):
-            print(f"Warning: Missing required columns in trips_df. Available: {trips_df.columns.tolist()}")
-            return routes
-            
-        if not all(col in stop_times_df.columns for col in required_stop_time_cols):
-            print(f"Warning: Missing required columns in stop_times_df. Available: {stop_times_df.columns.tolist()}")
-            return routes
-            
-        if not all(col in routes_df.columns for col in required_route_cols):
-            print(f"Warning: Missing required columns in routes_df. Available: {routes_df.columns.tolist()}")
-            return routes
-        
-        # Sample a subset of trips to reduce complexity (max 100 routes)
-        route_ids = routes_df['route_id'].unique()
-        route_sample = route_ids[:min(100, len(route_ids))]
-        
-        # Process each route
-        for route_id in route_sample:
-            # Get trips for this route
-            route_trips = trips_df[trips_df['route_id'] == route_id]
-            
-            # If no trips found, continue to next route
-            if len(route_trips) == 0:
+        # Process stops data
+        for stop in stops_data:
+            stop_id = stop.get('stop_id')
+            if not stop_id:
                 continue
                 
-            # Get route type
-            route_type = routes_df[routes_df['route_id'] == route_id]['route_type'].iloc[0]
-            if isinstance(route_type, str) and route_type.isdigit():
-                route_type = int(route_type)
-            elif not isinstance(route_type, (int, float)):
-                route_type = 2  # Default to rail
-                
-            # Take the first trip as representative of the route
-            sample_trip_id = route_trips['trip_id'].iloc[0]
+            # Get coordinates if available
+            stop_lat = stop.get('stop_lat')
+            stop_lon = stop.get('stop_lon')
             
-            # Get stop times for this trip
-            trip_stops = stop_times_df[stop_times_df['trip_id'] == sample_trip_id]
-            
-            # Sort by stop sequence
-            if 'stop_sequence' in trip_stops.columns:
-                trip_stops = trip_stops.sort_values('stop_sequence')
-            
-            # Extract the stop IDs in sequence
-            stop_ids = trip_stops['stop_id'].astype(str).tolist()
-            
-            # Only include routes with at least 2 stops
-            if len(stop_ids) >= 2:
-                # Get trip headsign if available
-                trip_headsign = ''
-                if 'trip_headsign' in route_trips.columns:
-                    trip_headsign = route_trips['trip_headsign'].iloc[0]
+            # Skip stops without valid coordinates
+            if not stop_lat or not stop_lon:
+                continue
                 
-                # Get route short name if available
-                route_name = f"Route {route_id}"
-                if 'route_short_name' in routes_df.columns:
-                    route_name_val = routes_df[routes_df['route_id'] == route_id]['route_short_name'].iloc[0]
-                    if pd.notna(route_name_val) and str(route_name_val).strip():
-                        route_name = str(route_name_val)
+            try:
+                lat = float(stop_lat)
+                lon = float(stop_lon)
                 
-                # Create the route object
-                route = {
-                    "train_id": f"{route_name} ({sample_trip_id})",
-                    "route_type": route_type,
-                    "stations": stop_ids,
-                    "route_id": route_id,
-                    "headsign": trip_headsign
-                }
-                routes.append(route)
-        
-        print(f"Constructed {len(routes)} routes from GTFS data")
-        
-    except Exception as e:
-        print(f"Error constructing routes from GTFS: {e}")
-    
-    return routes
-
-def create_route_map(routes, station_coords, output_path=None, realtime_data=None, dark_mode=False):
-    """
-    Create an interactive map showing train routes.
-    
-    Args:
-        routes: List of routes (each containing sequence of station IDs)
-        station_coords: Dictionary mapping station IDs to coordinates
-        output_path: Path to save the resulting HTML map
-        realtime_data: Optional real-time data to show vehicle positions
-        dark_mode: Whether to use dark mode theme
-    
-    Returns:
-        folium.Map: The created map object
-    """
-    # Determine center of map based on stations
-    if station_coords:
-        coords = list(station_coords.values())
-        avg_lat = sum(coord[0] for coord in coords) / len(coords)
-        avg_lon = sum(coord[1] for coord in coords) / len(coords)
-    else:
-        # Default to center of Belgium if no stations
-        avg_lat, avg_lon = 50.8503, 4.3517
-    
-    # Create a map centered on average coordinates
-    m = folium.Map(location=[avg_lat, avg_lon], zoom_start=7, 
-                  tiles='CartoDB dark_matter' if dark_mode else 'OpenStreetMap')
-    
-    # Create a feature group for all stations
-    station_group = folium.FeatureGroup(name="All Stations")
-    
-    # Create a marker cluster for stations
-    station_cluster = MarkerCluster(name="Station Clusters")
-    station_group.add_child(station_cluster)
-    
-    # Add stations to the map
-    for station_id, coords in station_coords.items():
-        # Create a marker for the station
-        popup_text = f"Station ID: {station_id}"
-        folium.CircleMarker(
-            location=coords,
-            radius=3,
-            popup=popup_text,
-            fill=True,
-            fill_opacity=0.7,
-            color='white' if dark_mode else 'blue',
-            fill_color='white' if dark_mode else 'blue'
-        ).add_to(station_cluster)
-    
-    # Add station group to map
-    m.add_child(station_group)
-    
-    # Create a feature group for routes
-    routes_group = folium.FeatureGroup(name="Train Routes")
-    
-    # Add routes to the map
-    for i, route in enumerate(routes):
-        # Extract route data
-        stations = route.get('stations', [])
-        route_type = route.get('route_type', 2)  # Default to rail
-        train_id = route.get('train_id', f"Route {i}")
-        headsign = route.get('headsign', '')
-        
-        # Generate a color for the route
-        color = get_route_color(i, len(routes), route_type)
-        
-        # Collect coordinates for all stations in the route
-        route_coords = []
-        for station_id in stations:
-            if station_id in station_coords:
-                route_coords.append(station_coords[station_id])
-        
-        # Only create route if we have at least 2 stations with coords
-        if len(route_coords) >= 2:
-            # Create a polyline for the route
-            route_name = f"{train_id}"
-            if headsign:
-                route_name += f" to {headsign}"
-                
-            folium.PolyLine(
-                locations=route_coords,
-                color=color,
-                weight=3,
-                opacity=0.7,
-                popup=route_name
-            ).add_to(routes_group)
-    
-    # Add routes group to map
-    m.add_child(routes_group)
-    
-    # Add real-time data if available
-    if realtime_data:
-        realtime_group = folium.FeatureGroup(name="Real-time Positions")
-        
-        # Process vehicle positions if available
-        if "vehicle_positions" in realtime_data:
-            for position in realtime_data["vehicle_positions"]:
-                if "lat" in position and "lon" in position:
-                    # Create a marker for the vehicle
-                    vehicle_id = position.get("vehicle_id", "Unknown")
-                    trip_id = position.get("trip_id", "Unknown")
+                # Skip stops with invalid coordinates
+                if lat == 0 and lon == 0:
+                    continue
                     
-                    popup_text = f"Vehicle: {vehicle_id}<br>Trip: {trip_id}"
-                    folium.Marker(
-                        location=[position["lat"], position["lon"]],
-                        popup=popup_text,
-                        icon=folium.Icon(color='red', icon='bus')
-                    ).add_to(realtime_group)
-        
-        # Process API real-time data if available
-        if "api_realtime" in realtime_data:
-            api_data = realtime_data["api_realtime"]
-            if "entity" in api_data:
-                for entity in api_data["entity"]:
-                    # Extract vehicle position data if available
-                    if "vehicle" in entity and "position" in entity["vehicle"]:
-                        position = entity["vehicle"]["position"]
-                        if "latitude" in position and "longitude" in position:
-                            # Create a marker for the vehicle
-                            vehicle_id = entity["vehicle"].get("vehicle", {}).get("id", "Unknown")
-                            trip_id = entity["vehicle"].get("trip", {}).get("tripId", "Unknown")
-                            
-                            popup_text = f"Vehicle: {vehicle_id}<br>Trip: {trip_id}"
-                            folium.Marker(
-                                location=[position["latitude"], position["longitude"]],
-                                popup=popup_text,
-                                icon=folium.Icon(color='red', icon='bus')
-                            ).add_to(realtime_group)
-        
-        # Add real-time group to map
-        m.add_child(realtime_group)
+                stations[stop_id] = {
+                    'name': stop.get('stop_name', f'Station {stop_id}'),
+                    'coords': (lat, lon),
+                    'zone_id': stop.get('zone_id'),
+                    'location_type': stop.get('location_type'),
+                    'parent_station': stop.get('parent_station'),
+                }
+            except (ValueError, TypeError):
+                logging.warning(f"Invalid coordinates for station {stop_id}")
     
-    # Add layer control to toggle visibility
-    folium.LayerControl().add_to(m)
+    except Exception as e:
+        logging.error(f"Error loading station data: {e}")
+        # Fallback to empty stations dictionary will be handled by the caller
     
-    # Save the map if output_path is provided
-    if output_path:
-        m.save(output_path)
-    
-    return m
+    return stations
 
-def load_route_data(file_path=None):
+def load_trips_data() -> Dict[str, Dict[str, Any]]:
     """
-    Load train route data.
+    Load trips data from the API.
+    
+    Returns:
+        Dict[str, Dict[str, Any]]: Dictionary of trip data with trip_id as key
+    """
+    trips = {}
+    
+    try:
+        # Get trips data from API
+        trips_data = api_client.get_trips()
+        logging.info(f"Loaded {len(trips_data)} trips from API")
+        
+        # Process trips data
+        for trip in trips_data:
+            trip_id = trip.get('trip_id')
+            if not trip_id:
+                continue
+                
+            trips[trip_id] = {
+                'route_id': trip.get('route_id'),
+                'service_id': trip.get('service_id'),
+                'trip_headsign': trip.get('trip_headsign', ''),
+                'trip_short_name': trip.get('trip_short_name', ''),
+                'direction_id': trip.get('direction_id'),
+                'block_id': trip.get('block_id'),
+                'shape_id': trip.get('shape_id'),
+                'stops': []  # Will be populated with stop_times data
+            }
+    except Exception as e:
+        logging.error(f"Error loading trips data: {e}")
+    
+    return trips
+
+def load_stop_times_data(trips_dict: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """
+    Load stop times data from the API and populate trips with their stops.
     
     Args:
-        file_path: Path to the route data file or GTFS file (optional if using API)
+        trips_dict (Dict[str, Dict[str, Any]]): Dictionary of trip data to populate
         
     Returns:
-        list: List of routes, each containing a sequence of station IDs
+        Dict[str, Dict[str, Any]]: Updated dictionary of trip data with stops
     """
-    # Try to get routes from API first
     try:
-        # Get trips, stop times and routes data from API
-        trips_df = api_client.get_trips_df()
-        stop_times_df = api_client.get_stop_times_df()
-        routes_df = api_client.get_routes_df()
+        # Get stop_times data from API
+        stop_times_data = api_client.get_stop_times()
+        logging.info(f"Loaded {len(stop_times_data)} stop times from API")
         
-        if all([len(df) > 0 for df in [trips_df, stop_times_df, routes_df]]):
-            routes = construct_routes_from_gtfs(trips_df, stop_times_df, routes_df)
-            if routes:
-                print(f"Successfully constructed {len(routes)} routes from API data")
-                return routes
+        # Process stop_times data and add to trips
+        for stop_time in stop_times_data:
+            trip_id = stop_time.get('trip_id')
+            if not trip_id or trip_id not in trips_dict:
+                continue
+                
+            stop_id = stop_time.get('stop_id')
+            if not stop_id:
+                continue
+                
+            stop_sequence = int(stop_time.get('stop_sequence', 0))
+            
+            # Add stop to trip's stops list
+            trips_dict[trip_id]['stops'].append({
+                'stop_id': stop_id,
+                'stop_sequence': stop_sequence,
+                'arrival_time': stop_time.get('arrival_time'),
+                'departure_time': stop_time.get('departure_time'),
+                'pickup_type': stop_time.get('pickup_type'),
+                'drop_off_type': stop_time.get('drop_off_type')
+            })
+        
+        # Sort each trip's stops by stop_sequence
+        for trip_id, trip_data in trips_dict.items():
+            trip_data['stops'] = sorted(trip_data['stops'], key=lambda x: x['stop_sequence'])
+    
     except Exception as e:
-        print(f"Error constructing routes from API data: {e}")
+        logging.error(f"Error loading stop times data: {e}")
     
-    # If API doesn't work, try to construct routes from local GTFS
-    paths = get_data_paths()
-    # Use planning_dir instead of PLANNING_DIR to match the updated structure
-    planning_dir = paths['planning_dir']
+    return trips_dict
+
+def load_route_data() -> List[Dict[str, Any]]:
+    """
+    Load route data from the API.
     
-    # Try to construct routes from GTFS
-    stops_df, routes_df, trips_df, stop_times_df = extract_gtfs_data(file_path)
-    
-    if all(df is not None for df in [trips_df, stop_times_df]):
-        routes = construct_routes_from_gtfs(trips_df, stop_times_df, routes_df)
-        if routes:
-            return routes
-    
+    Returns:
+        List[Dict[str, Any]]: List of route data
+    """
     routes = []
     
-    # If not GTFS or GTFS processing failed, try other formats
-    if file_path is None:
-        file_path = os.path.join(planning_dir, "routes.csv")
-    
     try:
-        # Attempt to load route data based on file extension
-        if os.path.exists(file_path):
-            # ... existing code for loading from local file ...
-            pass
-    except Exception as e:
-        print(f"Error loading route data: {e}")
+        # Get routes data from API
+        routes_data = api_client.get_routes()
+        logging.info(f"Loaded {len(routes_data)} routes from API")
+        
+        # Process routes data
+        for route in routes_data:
+            route_id = route.get('route_id')
+            if not route_id:
+                continue
+            
+            # Create a route object
+            route_obj = {
+                'route_id': route_id,
+                'agency_id': route.get('agency_id'),
+                'route_short_name': route.get('route_short_name'),
+                'route_long_name': route.get('route_long_name'),
+                'route_type': int(route.get('route_type', 2)),  # Default to rail (2)
+                'route_color': route.get('route_color', ''),
+                'route_text_color': route.get('route_text_color', ''),
+                'train_id': f"{route.get('agency_id', '')}:{route.get('route_short_name', '')}",
+                'headsign': route.get('route_long_name', ''),
+                'trips': []  # Will be populated with trips data
+            }
+            
+            routes.append(route_obj)
+        
+        # If we don't have route data, log an error
+        if not routes:
+            logging.error("No routes loaded from API, using fallback data")
+            routes = generate_simulated_routes()
     
-    # If no routes found, use example routes
-    if not routes:
-        print("No routes found. Using example Belgian routes.")
-        routes = [
-            {"train_id": "IC1234", "route_type": 2, "stations": ["8814001", "8821006", "8891009"]},
-            {"train_id": "IC5678", "route_type": 2, "stations": ["8814001", "8892007", "8863008"]},
-            {"train_id": "L7890", "route_type": 2, "stations": ["8814001", "8844008", "8841004"]}
-        ]
+    except Exception as e:
+        logging.error(f"Error loading route data: {e}")
+        # Generate simulated routes as fallback
+        routes = generate_simulated_routes()
     
     return routes
 
-def visualize_train_routes(gtfs_file=None, routes_file=None, stations_file=None, output_file=None, include_realtime=True, dark_mode=False):
+def connect_routes_with_trips(routes: List[Dict[str, Any]], trips: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Main function to visualize train routes on a map.
+    Connect routes with their trips to get stop sequences.
     
     Args:
-        gtfs_file: Path to the GTFS zip file
-        routes_file: Path to the file containing route data
-        stations_file: Path to the file containing station data
-        output_file: Name of the output HTML file
-        include_realtime: Whether to include real-time data in visualization
-        dark_mode: Whether to use dark mode theme
+        routes (List[Dict[str, Any]]): List of route data
+        trips (Dict[str, Dict[str, Any]]): Dictionary of trip data
         
     Returns:
-        str: Path to the generated map file
+        List[Dict[str, Any]]: Updated list of route data with trip information
     """
-    # Get paths from data_paths module
-    paths = get_data_paths()
-    maps_dir = paths['MAPS_DIR']  # Use uppercase key to match what's returned by ensure_directories()
+    for route in routes:
+        route_id = route['route_id']
+        route_trips = []
+        
+        # Find all trips for this route
+        for trip_id, trip_data in trips.items():
+            if trip_data['route_id'] == route_id:
+                # If the trip has stops, add it to route's trips
+                if trip_data['stops']:
+                    route_trips.append({
+                        'trip_id': trip_id,
+                        'headsign': trip_data['trip_headsign'],
+                        'stops': trip_data['stops']
+                    })
+        
+        # Sort trips by the number of stops (more stops first)
+        route_trips.sort(key=lambda x: len(x['stops']), reverse=True)
+        
+        # Add trips to route
+        route['trips'] = route_trips
+        
+        # Extract station sequence from the first trip (most complete one)
+        if route_trips:
+            route['stations'] = [stop['stop_id'] for stop in route_trips[0]['stops']]
+        else:
+            route['stations'] = []
     
-    # Ensure directories exist
-    ensure_directories()
+    # Filter out routes without any stops/stations
+    routes = [route for route in routes if route['stations']]
     
-    # Set default output file if not provided
-    if output_file is None:
-        output_file = "train_routes_map.html"
-    output_path = os.path.join(maps_dir, output_file)
+    return routes
+
+def get_simulated_route_stations(route_id: str) -> List[str]:
+    """
+    Get a list of stations for a route (simulated for demo).
+    In a real implementation, this would query the trips and stop_times tables.
     
-    # Load station and route data from API by default
-    print("Loading station and route data...")
-    station_coords = load_station_data(stations_file)
-    routes = load_route_data(routes_file)
+    Args:
+        route_id (str): The route ID
+        
+    Returns:
+        List[str]: List of station IDs
+    """
+    # Major Belgian stations to use for simulation
+    major_stations = [
+        "8811007",  # Gent-Sint-Pieters
+        "8821006",  # Brussel-Zuid
+        "8831005",  # Leuven
+        "8831310",  # Antwerpen-Centraal
+        "8841004",  # Oostende
+        "8841608",  # Brugge
+        "8844628",  # Kortrijk
+        "8863008",  # Hasselt
+        "8865003",  # Genk
+        "8866001",  # Luik-Guillemins
+        "8872009",  # Charleroi-Zuid
+        "8883006",  # Namen
+        "8884335",  # Doornik
+        "8891405",  # Mechelen
+        "8891660",  # Blankenberge
+        "8891702",  # Gent-Dampoort
+        "8892007",  # Denderleeuw
+        "8893401",  # Aalst
+        "8895505",  # Dendermonde
+        "8896008",  # Poperinge
+        "8896735",  # Ieper
+    ]
     
-    # Load real-time data if requested
-    realtime_data = None
-    if include_realtime:
-        try:
-            # Get real-time data from API
-            print("Loading real-time data from API...")
-            api_realtime_data = api_client.get_realtime_data()
+    # Use hash of route_id to create a deterministic but seemingly random selection
+    import hashlib
+    seed = int(hashlib.md5(route_id.encode()).hexdigest(), 16) % 10000
+    np.random.seed(seed)
+    
+    # Select origin and destination
+    origin_idx = np.random.randint(0, len(major_stations))
+    origin = major_stations[origin_idx]
+    
+    # Make sure destination is different from origin
+    dest_idx = (origin_idx + 1 + np.random.randint(0, len(major_stations) - 1)) % len(major_stations)
+    destination = major_stations[dest_idx]
+    
+    # Determine route direction
+    if origin_idx < dest_idx:
+        direction = 1
+        stations_pool = major_stations[origin_idx+1:dest_idx]
+    else:
+        direction = -1
+        stations_pool = major_stations[dest_idx+1:origin_idx]
+    
+    # Select intermediate stations
+    num_intermediate = min(np.random.randint(1, 5), len(stations_pool))
+    if direction == -1:
+        stations_pool = stations_pool[::-1]
+    
+    if len(stations_pool) > 0 and num_intermediate > 0:
+        intermediates = list(np.random.choice(
+            stations_pool, 
+            size=min(num_intermediate, len(stations_pool)), 
+            replace=False
+        ))
+    else:
+        intermediates = []
+    
+    # Construct full route
+    if direction == 1:
+        route_stations = [origin] + intermediates + [destination]
+    else:
+        route_stations = [destination] + intermediates + [origin]
+    
+    return route_stations
+
+def generate_simulated_routes(num_routes=30) -> List[Dict[str, Any]]:
+    """
+    Generate simulated routes for testing.
+    
+    Args:
+        num_routes (int): Number of routes to generate
+        
+    Returns:
+        List[Dict[str, Any]]: List of route data
+    """
+    routes = []
+    
+    for i in range(num_routes):
+        route_id = f"R{10000 + i}"
+        agency_id = "NMBS"
+        route_short_name = f"{100 + i}"
+        
+        # Select a random route type (mostly trains)
+        route_types = [0, 1, 2, 3]  # 0=tram, 1=subway, 2=rail, 3=bus
+        route_type_weights = [0.05, 0.05, 0.85, 0.05]  # 85% trains
+        route_type = np.random.choice(route_types, p=route_type_weights)
+        
+        # Generate headsign based on origin and destination
+        stations = get_simulated_route_stations(route_id)
+        if len(stations) >= 2:
+            origin_id = stations[0]
+            dest_id = stations[-1]
+            headsign = f"{origin_id} - {dest_id}"
+        else:
+            headsign = f"Route {route_short_name}"
+        
+        # Create route object
+        route = {
+            'route_id': route_id,
+            'agency_id': agency_id,
+            'route_short_name': route_short_name,
+            'route_long_name': headsign,
+            'route_type': route_type,
+            'route_color': '',
+            'route_text_color': '',
+            'train_id': f"{agency_id}:{route_short_name}",
+            'headsign': headsign,
+            'stations': stations
+        }
+        
+        routes.append(route)
+    
+    return routes
+
+def get_route_color(index: int, total: int, route_type: int = 2) -> str:
+    """
+    Get a color for a route based on its index and type.
+    
+    Args:
+        index (int): Index of the route
+        total (int): Total number of routes
+        route_type (int): Type of the route (0=tram, 1=subway, 2=rail, 3=bus)
+        
+    Returns:
+        str: Hex color code
+    """
+    # Base color by route type
+    base_colors = {
+        0: '#FF9800',  # Tram: Orange
+        1: '#673AB7',  # Subway: Purple
+        2: '#2196F3',  # Rail: Blue
+        3: '#4CAF50',  # Bus: Green
+        4: '#F44336',  # Ferry: Red
+        5: '#795548',  # Cable car: Brown
+        6: '#607D8B',  # Gondola: Blue-grey
+        7: '#9E9E9E',  # Funicular: Grey
+    }
+    
+    # Get base color or default to blue
+    base = base_colors.get(route_type, '#2196F3')
+    
+    # Convert hex to RGB
+    r = int(base[1:3], 16) / 255
+    g = int(base[3:5], 16) / 255
+    b = int(base[5:7], 16) / 255
+    
+    # Convert RGB to HSV
+    import colorsys
+    h, s, v = colorsys.rgb_to_hsv(r, g, b)
+    
+    # Vary the hue based on the index, but keep it close to the base color
+    if total > 1:
+        h_variation = 0.2  # 20% variation in hue
+        h = (h + h_variation * (index / (total - 1) - 0.5)) % 1.0
+    
+    # Convert back to RGB
+    r, g, b = colorsys.hsv_to_rgb(h, s, v)
+    
+    # Convert RGB to hex
+    color = '#%02x%02x%02x' % (int(r * 255), int(g * 255), int(b * 255))
+    return color
+
+def get_realtime_train_data() -> Dict[str, Dict[str, Any]]:
+    """
+    Get realtime train data from the API.
+    
+    Returns:
+        Dict[str, Dict[str, Any]]: Dictionary of train data with train_id as key
+    """
+    realtime_trains = {}
+    
+    try:
+        # Get realtime data
+        realtime_data = get_realtime_data()
+        
+        # Check if API returned expected structure
+        if not realtime_data or not isinstance(realtime_data, dict):
+            logging.warning("Realtime API returned unexpected data format")
+            return realtime_trains
             
-            if api_realtime_data and 'entity' in api_realtime_data:
-                print(f"Using real-time data from API with {len(api_realtime_data['entity'])} entities")
-                realtime_data = {"api_realtime": api_realtime_data}
-            else:
-                print("No real-time data available from API, trying local files...")
+        # Process entities if they exist
+        entities = realtime_data.get('entity', [])
+        
+        # If no entities, try simulating realtime data (for testing)
+        if not entities:
+            logging.warning("No realtime entities found in API response, simulating 10 trains")
+            return simulate_realtime_trains(10)
+            
+        # Process entities
+        for entity in entities:
+            # Extract train ID
+            train_id = entity.get('id', '')
+            if not train_id:
+                continue
                 
-                # Fall back to local files if API doesn't have data
-                specific_realtime_data = read_specific_realtime_files()
+            # Get vehicle position if available
+            vehicle = entity.get('vehicle', {})
+            position = vehicle.get('position', {})
+            
+            lat = position.get('latitude')
+            lon = position.get('longitude')
+            
+            # Skip entities without position
+            if not lat or not lon:
+                continue
                 
-                if specific_realtime_data and not any('error' in data for data in specific_realtime_data.values()):
-                    # Process the data for map visualization
-                    vehicle_positions = []
-                    for data_type, data in specific_realtime_data.items():
-                        if 'error' not in data:
-                            positions = extract_vehicle_positions({data_type: data})
-                            vehicle_positions.extend(positions)
-                    
-                    if vehicle_positions:
-                        print(f"Using {len(vehicle_positions)} vehicle positions from local files")
-                        realtime_data = {"vehicle_positions": vehicle_positions}
-        except Exception as e:
-            print(f"Error loading real-time data: {e}")
+            # Get current status
+            current_status = vehicle.get('current_status', 0)
+            status_map = {
+                0: 'Incoming at stop',
+                1: 'Stopped at stop',
+                2: 'In transit to next stop'
+            }
+            status_text = status_map.get(current_status, 'Unknown')
+            
+            # Get delay in minutes
+            delay_seconds = vehicle.get('delay', 0)
+            delay_minutes = max(0, int(delay_seconds / 60))
+            
+            # Get trip details
+            trip = vehicle.get('trip', {})
+            trip_id = trip.get('trip_id', '')
+            route_id = trip.get('route_id', '')
+            
+            # Store train data
+            realtime_trains[train_id] = {
+                'position': (lat, lon),
+                'status': status_text,
+                'delay': delay_minutes,
+                'trip_id': trip_id,
+                'route_id': route_id,
+                'timestamp': datetime.datetime.now().isoformat()
+            }
     
-    # Create and save map
-    print(f"Creating map with {len(routes)} routes and {len(station_coords)} stations...")
-    m = create_route_map(routes, station_coords, output_path, realtime_data, dark_mode)
-    print(f"Map created and saved to: {output_path}")
+    except Exception as e:
+        logging.error(f"Error getting realtime train data: {e}")
     
-    return output_path
+    return realtime_trains
+
+def simulate_realtime_trains(num_trains=10) -> Dict[str, Dict[str, Any]]:
+    """
+    Simulate realtime train data for testing when API doesn't return data.
+    
+    Args:
+        num_trains (int): Number of trains to simulate
+        
+    Returns:
+        Dict[str, Dict[str, Any]]: Dictionary of simulated train data
+    """
+    import random
+    
+    # Belgium geographical boundaries (approx)
+    min_lat, max_lat = 49.5, 51.5
+    min_lon, max_lon = 2.5, 6.5
+    
+    simulated_trains = {}
+    
+    # Generate random train IDs and positions
+    for i in range(num_trains):
+        train_id = f"NMBS:{random.randint(100, 999)}"
+        
+        # Random position in Belgium
+        lat = min_lat + random.random() * (max_lat - min_lat)
+        lon = min_lon + random.random() * (max_lon - min_lon)
+        
+        # Random status and delay
+        status_options = ['Incoming at stop', 'Stopped at stop', 'In transit to next stop']
+        status = random.choice(status_options)
+        delay = random.randint(0, 20)  # 0-20 minutes delay
+        
+        # Random route and trip IDs
+        route_id = f"R{10000 + random.randint(1, 100)}"
+        trip_id = f"T{20000 + random.randint(1, 100)}"
+        
+        # Store simulated train
+        simulated_trains[train_id] = {
+            'position': (lat, lon),
+            'status': status,
+            'delay': delay,
+            'trip_id': trip_id,
+            'route_id': route_id,
+            'timestamp': datetime.datetime.now().isoformat(),
+            'simulated': True
+        }
+    
+    logging.info(f"Generated {num_trains} simulated trains for testing")
+    return simulated_trains
+
+def create_realtime_train_routes_map(max_routes=20, save_path=None):
+    """
+    Create an interactive map showing realtime train routes.
+    
+    Args:
+        max_routes (int): Maximum number of routes to display
+        save_path (str): Path to save the map HTML file, or None to use default
+        
+    Returns:
+        str: Path to the saved HTML map file
+    """
+    import colorsys
+    import folium
+    from folium.plugins import MarkerCluster, FeatureGroupSubGroup
+    import datetime
+    
+    # Load station data
+    stations = load_station_data()
+    print(f"✓ Loaded {len(stations)} stations")
+    
+    # Load trips and stop_times data
+    trips = load_trips_data()
+    trips = load_stop_times_data(trips)
+    
+    # Load route data
+    routes = load_route_data()
+    print(f"✓ Loaded {len(routes)} routes")
+    
+    # Connect routes with trips to get stop sequences
+    routes = connect_routes_with_trips(routes, trips)
+    
+    # Load realtime data
+    realtime_data = get_realtime_train_data()
+    print(f"✓ Loaded {len(realtime_data)} realtime trains")
+    
+    # Center the map on Belgium
+    map_center = [50.85, 4.35]  # Brussels coordinates
+    
+    # Create a map
+    train_map = folium.Map(
+        location=map_center,
+        zoom_start=8,
+        tiles='CartoDB positron'
+    )
+    
+    # Add title and timestamp
+    title_html = f'''
+        <h3 align="center" style="font-size:16px">
+            <b>Belgian Railways (NMBS/SNCB) - Real-time Train Routes</b>
+        </h3>
+        <h4 align="center" style="font-size:14px">
+            Last updated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+            <br><span style="font-size:12px">(API updates every 30 seconds)</span>
+        </h4>
+    '''
+    train_map.get_root().html.add_child(folium.Element(title_html))
+    
+    # Create a marker cluster for stations
+    station_cluster = MarkerCluster(name="All Stations")
+    train_map.add_child(station_cluster)
+    
+    # Create a feature group for routes
+    route_group = folium.FeatureGroup(name="All Routes")
+    train_map.add_child(route_group)
+    
+    # Add stations to the map
+    for station_id, station_info in stations.items():
+        # Skip stations without valid coordinates
+        if 'coords' not in station_info:
+            continue
+            
+        lat, lon = station_info['coords']
+        
+        # Create popup content with station info
+        popup_content = f"""
+        <div style="min-width: 180px; max-width: 250px">
+            <h4>{station_info['name']}</h4>
+            <b>Station ID:</b> {station_id}<br>
+            <b>Platforms:</b> {station_info.get('num_platforms', 'Unknown')}<br>
+            <b>Coordinates:</b> {lat:.4f}, {lon:.4f}
+        </div>
+        """
+        
+        # Add marker with popup
+        folium.Marker(
+            [lat, lon],
+            popup=folium.Popup(popup_content, max_width=300),
+            tooltip=station_info['name'],
+            icon=folium.Icon(icon='train', prefix='fa', color='blue')
+        ).add_to(station_cluster)
+    
+    # Filter and limit the number of routes to display
+    active_routes = []
+    
+    # First, add routes with realtime data
+    for train_id, train_info in realtime_data.items():
+        route_id = train_info.get('route_id')
+        for route in routes:
+            if route['route_id'] == route_id:
+                route['realtime'] = train_info
+                active_routes.append(route)
+                break
+                
+        # If no route found by route_id, try matching by train_id
+        if not any(r.get('realtime') == train_info for r in active_routes):
+            for route in routes:
+                if route['train_id'] == train_id:
+                    route['realtime'] = train_info
+                    active_routes.append(route)
+                    break
+        
+        # If we've reached the maximum, stop
+        if len(active_routes) >= max_routes:
+            break
+    
+    # If we still have space, add routes with most stops
+    if len(active_routes) < max_routes:
+        remaining_slots = max_routes - len(active_routes)
+        existing_route_ids = {r['route_id'] for r in active_routes}
+        
+        # Sort the remaining routes by number of stations (most first)
+        regular_routes = sorted(
+            [r for r in routes if r['route_id'] not in existing_route_ids],
+            key=lambda r: len(r.get('stations', [])),
+            reverse=True
+        )
+        
+        active_routes.extend(regular_routes[:remaining_slots])
+    
+    # Create a route-specific layer for each route
+    for idx, route in enumerate(active_routes):
+        # Get route details
+        route_id = route['route_id']
+        train_id = route['train_id']
+        headsign = route.get('headsign', '')
+        route_type = route.get('route_type', 2)  # Default to rail
+        
+        # Set route color
+        route_color = get_route_color(idx, len(active_routes), route_type)
+        
+        # Create a route group for this specific route
+        route_name = f"Route {route_id} - {headsign}" if headsign else f"Route {route_id}"
+        route_specific_group = FeatureGroupSubGroup(
+            route_group, 
+            name=route_name
+        )
+        train_map.add_child(route_specific_group)
+        
+        # Get the station IDs for this route
+        station_ids = route.get('stations', [])
+        
+        # Skip routes without enough stations
+        if len(station_ids) < 2:
+            continue
+        
+        # Create lists to store coordinates and station details
+        route_coords = []
+        valid_station_count = 0
+        
+        # Realtime info if available
+        realtime_info = route.get('realtime', {})
+        is_realtime = bool(realtime_info)
+        current_position = realtime_info.get('position')
+        current_status = realtime_info.get('status', 'No real-time data')
+        current_delay = realtime_info.get('delay', 0)
+        
+        # Add each station to the route
+        for i, station_id in enumerate(station_ids):
+            if station_id in stations and 'coords' in stations[station_id]:
+                valid_station_count += 1
+                station_info = stations[station_id]
+                lat, lon = station_info['coords']
+                route_coords.append([lat, lon])
+                
+                # Station status
+                is_first = i == 0
+                is_last = i == len(station_ids) - 1
+                
+                # Determine station type
+                if is_first:
+                    station_type = "Origin"
+                    icon_color = "green"
+                elif is_last:
+                    station_type = "Destination" 
+                    icon_color = "red"
+                else:
+                    station_type = "Stop"
+                    icon_color = "orange"
+                
+                # Create popup with detailed route information
+                popup_content = f"""
+                <div style="min-width: 200px; max-width: 300px">
+                    <h4>{station_info['name']} ({station_type})</h4>
+                    <b>Route:</b> {route_id}<br>
+                    <b>Train ID:</b> {train_id}<br>
+                    <b>Direction:</b> {headsign}<br>
+                    <hr>
+                    <b>Stop sequence:</b> {i+1} of {len(station_ids)}<br>
+                """
+                
+                # Add realtime information if available
+                if is_realtime:
+                    popup_content += f"""
+                    <hr>
+                    <b>Real-time Status:</b> {current_status}<br>
+                    <b>Current Delay:</b> {current_delay} minutes<br>
+                    """
+                
+                popup_content += "</div>"
+                
+                # Add marker for station
+                station_marker = folium.Marker(
+                    [lat, lon],
+                    popup=folium.Popup(popup_content, max_width=300),
+                    tooltip=f"{station_info['name']} ({station_type})",
+                    icon=folium.Icon(icon='circle', prefix='fa', color=icon_color)
+                )
+                station_marker.add_to(route_specific_group)
+        
+        # Skip routes without enough valid stations
+        if valid_station_count < 2:
+            continue
+            
+        # Create route line
+        route_line = folium.PolyLine(
+            route_coords,
+            color=route_color,
+            weight=3,
+            opacity=0.8,
+            tooltip=f"Route {route_id} - {headsign}"
+        )
+        route_line.add_to(route_specific_group)
+        
+        # Add train icon for current position if realtime data available
+        if is_realtime and current_position:
+            pos_lat, pos_lon = current_position
+            
+            # Create detailed popup for the train
+            train_popup = f"""
+            <div style="min-width: 250px; max-width: 350px">
+                <h4>Train {train_id}</h4>
+                <b>Route:</b> {route_id}<br>
+                <b>Direction:</b> {headsign}<br>
+                <hr>
+                <b>Current Status:</b> {current_status}<br>
+                <b>Current Delay:</b> {current_delay} minutes<br>
+                <b>Position:</b> {pos_lat:.4f}, {pos_lon:.4f}<br>
+                <hr>
+                <b>Origin:</b> {stations[station_ids[0]]['name'] if station_ids[0] in stations else "Unknown"}<br>
+                <b>Destination:</b> {stations[station_ids[-1]]['name'] if station_ids[-1] in stations else "Unknown"}<br>
+                <hr>
+                <button onclick="window.open('https://www.belgiantrain.be/en/travel-info/search-a-train?trainNumber={train_id.split(':')[-1] if ':' in train_id else train_id}', '_blank')">
+                    View on NMBS/SNCB Website
+                </button>
+            </div>
+            """
+            
+            # Add train marker with custom icon
+            train_icon = folium.Icon(
+                icon='subway',
+                prefix='fa',
+                color='darkred',
+                icon_color='white'
+            )
+            
+            train_marker = folium.Marker(
+                [pos_lat, pos_lon],
+                popup=folium.Popup(train_popup, max_width=350),
+                tooltip=f"Train {train_id} ({current_status})",
+                icon=train_icon
+            )
+            train_marker.add_to(route_specific_group)
+    
+    # Add layer control
+    folium.LayerControl().add_to(train_map)
+
+    # Determine save path
+    if not save_path:
+        timestamp = int(time.time())
+        maps_dir = os.path.join('reports', 'maps')
+        os.makedirs(maps_dir, exist_ok=True)
+        save_path = os.path.join(maps_dir, f'train_routes_{timestamp}.html')
+
+    # Save the map
+    train_map.save(save_path)
+    print(f"Map saved to: {save_path}")
+    
+    return save_path
 
 if __name__ == "__main__":
     # When run directly, generate a map using default settings
-    map_path = visualize_train_routes()
+    map_path = create_realtime_train_routes_map()
     print(f"To view the map, open: {map_path}")

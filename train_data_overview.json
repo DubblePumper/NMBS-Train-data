@@ -11,28 +11,22 @@
     "without_platform_changes": 1
   },
   "metadata": {
-    "generated_at": "2025-04-07T12:35:07.571380",
+    "generated_at": "2025-04-07T18:04:05.278708",
     "planning_dir": "C:\\Users\\sande\\Documents\\GitHub\\NMBS-Train-data\\reports",
     "realtime_dir": "C:\\Users\\sande\\Documents\\GitHub\\NMBS-Train-data\\reports\\realtime",
     "data_source": "API"
   },
   "gtfs_stats": {
-    "stops_count": 1000,
-    "routes_count": 908,
-    "routes_by_type": {
-      "103": 446,
-      "100": 319,
-      "700": 141,
-      "101": 2
-    },
-    "trips_count": 1000,
-    "stop_times_count": 1000
+    "stops_count": 0,
+    "routes_count": 0,
+    "trips_count": 40419,
+    "stop_times_count": 0
   },
   "realtime_stats": {
     "with_platform_changes_count": 0,
-    "without_platform_changes_count": 543,
+    "without_platform_changes_count": 584,
     "with_platform_changes_percent": 0.0,
     "without_platform_changes_percent": 100.0,
-    "generated_at": "2025-04-07T12:35:07.572707"
+    "generated_at": "2025-04-07T18:04:05.278930"
   }
 }

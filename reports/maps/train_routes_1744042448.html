@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    
+        <script>
+            L_NO_TOUCH = false;
+            L_DISABLE_3D = false;
+        </script>
+    
+    <style>html, body {width: 100%;height: 100%;margin: 0;padding: 0;}</style>
+    <style>#map {position:absolute;top:0;bottom:0;right:0;left:0;}</style>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_88f23caf571a9459035c02f44319bb21 {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+        
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/leaflet.markercluster.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/MarkerCluster.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/MarkerCluster.Default.css"/>
+    <script src="https://unpkg.com/leaflet.featuregroup.subgroup@1.0.2/dist/leaflet.featuregroup.subgroup.js"></script>
+</head>
+<body>
+    
+    
+        <h3 align="center" style="font-size:16px">
+            <b>Belgian Railways (NMBS/SNCB) - Real-time Train Routes</b>
+        </h3>
+        <h4 align="center" style="font-size:14px">
+            Last updated: 2025-04-07 18:14:08
+            <br><span style="font-size:12px">(API updates every 30 seconds)</span>
+        </h4>
+    
+    
+            <div class="folium-map" id="map_88f23caf571a9459035c02f44319bb21" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_88f23caf571a9459035c02f44319bb21 = L.map(
+                "map_88f23caf571a9459035c02f44319bb21",
+                {
+                    center: [50.85, 4.35],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 8,
+  "zoomControl": true,
+  "preferCanvas": false,
+}
+
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_e6f152b684927339191426bc9b9850e6 = L.tileLayer(
+                "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 20,
+  "maxNativeZoom": 20,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors \u0026copy; \u003ca href=\"https://carto.com/attributions\"\u003eCARTO\u003c/a\u003e",
+  "subdomains": "abcd",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_e6f152b684927339191426bc9b9850e6.addTo(map_88f23caf571a9459035c02f44319bb21);
+        
+    
+            var marker_cluster_8a38593c1acee7e7df6db31be9dc6419 = L.markerClusterGroup(
+                {
+}
+            );
+        
+    
+            marker_cluster_8a38593c1acee7e7df6db31be9dc6419.addTo(map_88f23caf571a9459035c02f44319bb21);
+        
+    
+            var feature_group_1e94c1e525640089173f78a6623f7e94 = L.featureGroup(
+                {
+}
+            );
+        
+    
+            feature_group_1e94c1e525640089173f78a6623f7e94.addTo(map_88f23caf571a9459035c02f44319bb21);
+        
+    
+            var feature_group_sub_group_8fb6c60d29e9ef5b8d5060abca483642 = L.featureGroup.subGroup(
+                feature_group_1e94c1e525640089173f78a6623f7e94
+            );
+        
+    
+            feature_group_sub_group_8fb6c60d29e9ef5b8d5060abca483642.addTo(map_88f23caf571a9459035c02f44319bb21);
+        
+    
+            var feature_group_sub_group_33597dc8e76659a1986726a8fc312821 = L.featureGroup.subGroup(
+                feature_group_1e94c1e525640089173f78a6623f7e94
+            );
+        
+    
+            feature_group_sub_group_33597dc8e76659a1986726a8fc312821.addTo(map_88f23caf571a9459035c02f44319bb21);
+        
+    
+            var feature_group_sub_group_e6090bf102598e9fdbbb620ae35a6564 = L.featureGroup.subGroup(
+                feature_group_1e94c1e525640089173f78a6623f7e94
+            );
+        
+    
+            feature_group_sub_group_e6090bf102598e9fdbbb620ae35a6564.addTo(map_88f23caf571a9459035c02f44319bb21);
+        
+    
+            var feature_group_sub_group_2ee25bbe7d9df56781d61510d618090a = L.featureGroup.subGroup(
+                feature_group_1e94c1e525640089173f78a6623f7e94
+            );
+        
+    
+            feature_group_sub_group_2ee25bbe7d9df56781d61510d618090a.addTo(map_88f23caf571a9459035c02f44319bb21);
+        
+    
+            var feature_group_sub_group_1c8e5a11f959818e91dca33693970454 = L.featureGroup.subGroup(
+                feature_group_1e94c1e525640089173f78a6623f7e94
+            );
+        
+    
+            feature_group_sub_group_1c8e5a11f959818e91dca33693970454.addTo(map_88f23caf571a9459035c02f44319bb21);
+        
+    
+            var feature_group_sub_group_0b72671a06f5aa4e646c60bb8b75f4ee = L.featureGroup.subGroup(
+                feature_group_1e94c1e525640089173f78a6623f7e94
+            );
+        
+    
+            feature_group_sub_group_0b72671a06f5aa4e646c60bb8b75f4ee.addTo(map_88f23caf571a9459035c02f44319bb21);
+        
+    
+            var feature_group_sub_group_bf4d894c5e2b696295ddc65a952270b8 = L.featureGroup.subGroup(
+                feature_group_1e94c1e525640089173f78a6623f7e94
+            );
+        
+    
+            feature_group_sub_group_bf4d894c5e2b696295ddc65a952270b8.addTo(map_88f23caf571a9459035c02f44319bb21);
+        
+    
+            var feature_group_sub_group_e7ff5161872a922f99c6f2ea628d68f7 = L.featureGroup.subGroup(
+                feature_group_1e94c1e525640089173f78a6623f7e94
+            );
+        
+    
+            feature_group_sub_group_e7ff5161872a922f99c6f2ea628d68f7.addTo(map_88f23caf571a9459035c02f44319bb21);
+        
+    
+            var feature_group_sub_group_bf3b3a48a6e6afbe2593978b4420c67f = L.featureGroup.subGroup(
+                feature_group_1e94c1e525640089173f78a6623f7e94
+            );
+        
+    
+            feature_group_sub_group_bf3b3a48a6e6afbe2593978b4420c67f.addTo(map_88f23caf571a9459035c02f44319bb21);
+        
+    
+            var feature_group_sub_group_2f8be7527ede6237e99fc36b131f84d3 = L.featureGroup.subGroup(
+                feature_group_1e94c1e525640089173f78a6623f7e94
+            );
+        
+    
+            feature_group_sub_group_2f8be7527ede6237e99fc36b131f84d3.addTo(map_88f23caf571a9459035c02f44319bb21);
+        
+    
+            var feature_group_sub_group_95f53b6281d79075ffb7265331d44ed6 = L.featureGroup.subGroup(
+                feature_group_1e94c1e525640089173f78a6623f7e94
+            );
+        
+    
+            feature_group_sub_group_95f53b6281d79075ffb7265331d44ed6.addTo(map_88f23caf571a9459035c02f44319bb21);
+        
+    
+            var feature_group_sub_group_f5b5b63aed0de54ade1e3592e5a7ed27 = L.featureGroup.subGroup(
+                feature_group_1e94c1e525640089173f78a6623f7e94
+            );
+        
+    
+            feature_group_sub_group_f5b5b63aed0de54ade1e3592e5a7ed27.addTo(map_88f23caf571a9459035c02f44319bb21);
+        
+    
+            var feature_group_sub_group_3827c20fd1c99f845bbeb300c733931a = L.featureGroup.subGroup(
+                feature_group_1e94c1e525640089173f78a6623f7e94
+            );
+        
+    
+            feature_group_sub_group_3827c20fd1c99f845bbeb300c733931a.addTo(map_88f23caf571a9459035c02f44319bb21);
+        
+    
+            var feature_group_sub_group_158b0ff4ff71d74699817770288ef0cd = L.featureGroup.subGroup(
+                feature_group_1e94c1e525640089173f78a6623f7e94
+            );
+        
+    
+            feature_group_sub_group_158b0ff4ff71d74699817770288ef0cd.addTo(map_88f23caf571a9459035c02f44319bb21);
+        
+    
+            var feature_group_sub_group_dc924d5edc56efb191e131051bc71fe4 = L.featureGroup.subGroup(
+                feature_group_1e94c1e525640089173f78a6623f7e94
+            );
+        
+    
+            feature_group_sub_group_dc924d5edc56efb191e131051bc71fe4.addTo(map_88f23caf571a9459035c02f44319bb21);
+        
+    
+            var layer_control_4c3577e7099190fabc7bb8cdee0d29e5_layers = {
+                base_layers : {
+                    "cartodbpositron" : tile_layer_e6f152b684927339191426bc9b9850e6,
+                },
+                overlays :  {
+                    "All Stations" : marker_cluster_8a38593c1acee7e7df6db31be9dc6419,
+                    "All Routes" : feature_group_1e94c1e525640089173f78a6623f7e94,
+                    "Route R10000 - 8841004 - 8863008" : feature_group_sub_group_8fb6c60d29e9ef5b8d5060abca483642,
+                    "Route R10001 - 8811007 - 8821006" : feature_group_sub_group_33597dc8e76659a1986726a8fc312821,
+                    "Route R10002 - 8831005 - 8893401" : feature_group_sub_group_e6090bf102598e9fdbbb620ae35a6564,
+                    "Route R10003 - 8863008 - 8884335" : feature_group_sub_group_2ee25bbe7d9df56781d61510d618090a,
+                    "Route R10004 - 8891405 - 8891702" : feature_group_sub_group_1c8e5a11f959818e91dca33693970454,
+                    "Route R10005 - 8865003 - 8884335" : feature_group_sub_group_0b72671a06f5aa4e646c60bb8b75f4ee,
+                    "Route R10006 - 8883006 - 8891702" : feature_group_sub_group_bf4d894c5e2b696295ddc65a952270b8,
+                    "Route R10007 - 8891660 - 8891702" : feature_group_sub_group_e7ff5161872a922f99c6f2ea628d68f7,
+                    "Route R10008 - 8821006 - 8865003" : feature_group_sub_group_bf3b3a48a6e6afbe2593978b4420c67f,
+                    "Route R10009 - 8863008 - 8884335" : feature_group_sub_group_2f8be7527ede6237e99fc36b131f84d3,
+                    "Route R10010 - 8821006 - 8891405" : feature_group_sub_group_95f53b6281d79075ffb7265331d44ed6,
+                    "Route R10011 - 8831005 - 8883006" : feature_group_sub_group_f5b5b63aed0de54ade1e3592e5a7ed27,
+                    "Route R10012 - 8866001 - 8893401" : feature_group_sub_group_3827c20fd1c99f845bbeb300c733931a,
+                    "Route R10013 - 8891660 - 8896735" : feature_group_sub_group_158b0ff4ff71d74699817770288ef0cd,
+                    "Route R10014 - 8863008 - 8866001" : feature_group_sub_group_dc924d5edc56efb191e131051bc71fe4,
+                },
+            };
+            let layer_control_4c3577e7099190fabc7bb8cdee0d29e5 = L.control.layers(
+                layer_control_4c3577e7099190fabc7bb8cdee0d29e5_layers.base_layers,
+                layer_control_4c3577e7099190fabc7bb8cdee0d29e5_layers.overlays,
+                {
+  "position": "topright",
+  "collapsed": true,
+  "autoZIndex": true,
+}
+            ).addTo(map_88f23caf571a9459035c02f44319bb21);
+
+        
+</script>
+</html>

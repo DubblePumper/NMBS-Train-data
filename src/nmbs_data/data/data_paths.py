@@ -120,3 +120,36 @@ def get_api_config():
     
     logger.info(f"Loaded API configuration: API URL={config['api_url']}, Port={config['api_port']}")
     return config
+
+def get_data_filepath(dir_type, filename):
+    """
+    Get an absolute filepath for a data file, ensuring the directory exists.
+    
+    Args:
+        dir_type (str): Directory type ('cache', 'maps', 'realtime', 'output')
+        filename (str): Name of the file
+        
+    Returns:
+        str: Absolute path to the file
+    """
+    paths = ensure_directories()
+    
+    # Map directory type to path
+    dir_map = {
+        'cache': paths.get('cache_dir'),
+        'maps': paths.get('MAPS_DIR'),
+        'realtime': paths.get('realtime_dir'),
+        'output': paths.get('output_dir')
+    }
+    
+    # Get the directory path
+    dir_path = dir_map.get(dir_type)
+    if not dir_path:
+        logger.warning(f"Unknown directory type: {dir_type}, using output directory")
+        dir_path = paths.get('output_dir')
+    
+    # Ensure directory exists
+    os.makedirs(dir_path, exist_ok=True)
+    
+    # Return full file path
+    return os.path.join(dir_path, filename)

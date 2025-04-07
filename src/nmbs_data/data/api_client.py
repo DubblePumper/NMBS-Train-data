@@ -48,6 +48,21 @@ class NMBSApiClient:
             logger.error(f"API health check failed: {str(e)}")
             return {"status": "error", "message": str(e)}
     
+    def get_ping(self):
+        """Simple ping test to check if the API is reachable.
+        
+        Returns:
+            dict: Response with status information
+        """
+        try:
+            response = requests.get(urljoin(self.base_url, "ping"), timeout=5)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(f"API ping failed: {str(e)}")
+            # Return a dict for consistent return type
+            return {"status": "error", "message": str(e)}
+    
     def _get_cache_path(self, endpoint):
         """Get the cache file path for an endpoint."""
         if not self.cache_dir:
@@ -143,6 +158,82 @@ class NMBSApiClient:
             logger.error(f"API POST request failed: {str(e)}")
             raise
     
+    def get_paginated(self, endpoint, params=None, use_cache=True):
+        """Make a GET request to a paginated API endpoint.
+        
+        Automatically fetches all pages of results and combines them.
+        
+        Args:
+            endpoint: API endpoint to access
+            params: Query parameters
+            use_cache: Whether to use cached responses
+            
+        Returns:
+            Combined data from all pages
+        """
+        # Set up initial parameters if not provided
+        if params is None:
+            params = {}
+        
+        # Try to use cache for the combined result first
+        cache_key = f"{endpoint}_all_pages"
+        cache_path = self._get_cache_path(cache_key)
+        
+        if use_cache and cache_path and self._is_cache_valid(cache_path):
+            cached_data = self._read_cache(cache_path)
+            if cached_data:
+                logger.info(f"Using cached combined data for {endpoint}")
+                return cached_data
+                
+        # If no cache or cache invalid, fetch all pages
+        all_data = []
+        current_page = 1
+        more_pages = True
+        
+        logger.info(f"Fetching all pages for {endpoint}")
+        
+        while more_pages:
+            # Add current page to parameters
+            page_params = params.copy()
+            page_params['page'] = current_page
+            
+            # Make the API request for this page
+            url = urljoin(self.base_url, endpoint)
+            try:
+                logger.info(f"Requesting {url} (page {current_page})")
+                response = requests.get(url, params=page_params)
+                response.raise_for_status()
+                page_data = response.json()
+                
+                # Check if data field exists and has content
+                if "data" in page_data and page_data["data"]:
+                    all_data.extend(page_data["data"])
+                    current_page += 1
+                    
+                    # Check if we've reached the last page
+                    if "meta" in page_data and "last_page" in page_data["meta"]:
+                        if current_page > page_data["meta"]["last_page"]:
+                            more_pages = False
+                            logger.info(f"Reached last page ({page_data['meta']['last_page']}) for {endpoint}")
+                    elif len(page_data["data"]) == 0:
+                        # If no metadata but empty data, assume we're done
+                        more_pages = False
+                        logger.info(f"Empty page received, assuming end of pagination for {endpoint}")
+                else:
+                    # No data field or empty data, assume we're done
+                    more_pages = False
+                    logger.info(f"No data field or empty data, ending pagination for {endpoint}")
+                    
+            except requests.RequestException as e:
+                logger.error(f"API request failed for page {current_page}: {str(e)}")
+                more_pages = False  # Stop trying more pages if we hit an error
+        
+        # Cache the combined results if applicable
+        if cache_path:
+            self._write_cache(cache_path, all_data)
+            
+        return all_data
+    
     # Planning data methods
     def get_planning_data_overview(self):
         """Get an overview of available planning data."""
@@ -152,61 +243,45 @@ class NMBSApiClient:
         """Get a list of available planning data files."""
         return self.get("planningdata/files")
     
-    def get_stops(self):
-        """Get the stops data."""
-        response = self.get("planningdata/stops")
-        if "data" in response:
-            return response["data"]
-        return response
+    def get_stops(self, use_cache=True):
+        """Get the stops data from all pages of the API.
+        
+        Args:
+            use_cache: Whether to use cached responses
+            
+        Returns:
+            List of all stops from all pages
+        """
+        # Use the paginated method to get all stops across all pages
+        return self.get_paginated("planningdata/stops", use_cache=use_cache)
     
-    def get_routes(self):
-        """Get the routes data."""
-        response = self.get("planningdata/routes")
-        if "data" in response:
-            return response["data"]
-        return response
+    def get_routes(self, use_cache=True):
+        """Get the routes data from all pages."""
+        return self.get_paginated("planningdata/routes", use_cache=use_cache)
     
-    def get_trips(self):
-        """Get the trips data."""
-        response = self.get("planningdata/trips")
-        if "data" in response:
-            return response["data"]
-        return response
+    def get_trips(self, use_cache=True):
+        """Get the trips data from all pages."""
+        return self.get_paginated("planningdata/trips", use_cache=use_cache)
     
-    def get_stop_times(self):
-        """Get the stop times data."""
-        response = self.get("planningdata/stop_times")
-        if "data" in response:
-            return response["data"]
-        return response
+    def get_stop_times(self, use_cache=True):
+        """Get the stop times data from all pages."""
+        return self.get_paginated("planningdata/stop_times", use_cache=use_cache)
     
-    def get_calendar(self):
-        """Get the calendar data."""
-        response = self.get("planningdata/calendar")
-        if "data" in response:
-            return response["data"]
-        return response
+    def get_calendar(self, use_cache=True):
+        """Get the calendar data from all pages."""
+        return self.get_paginated("planningdata/calendar", use_cache=use_cache)
     
-    def get_calendar_dates(self):
-        """Get the calendar dates data."""
-        response = self.get("planningdata/calendar_dates")
-        if "data" in response:
-            return response["data"]
-        return response
+    def get_calendar_dates(self, use_cache=True):
+        """Get the calendar dates data from all pages."""
+        return self.get_paginated("planningdata/calendar_dates", use_cache=use_cache)
     
-    def get_agency(self):
-        """Get the agency data."""
-        response = self.get("planningdata/agency")
-        if "data" in response:
-            return response["data"]
-        return response
+    def get_agency(self, use_cache=True):
+        """Get the agency data from all pages."""
+        return self.get_paginated("planningdata/agency", use_cache=use_cache)
     
-    def get_translations(self):
-        """Get the translations data."""
-        response = self.get("planningdata/translations")
-        if "data" in response:
-            return response["data"]
-        return response
+    def get_translations(self, use_cache=True):
+        """Get the translations data from all pages."""
+        return self.get_paginated("planningdata/translations", use_cache=use_cache)
     
     def get_planning_file(self, filename):
         """Get specific planning data file contents."""
@@ -223,8 +298,9 @@ class NMBSApiClient:
     
     # Helper methods to format API data into DataFrames
     def get_stops_df(self):
-        """Get stops data as a pandas DataFrame."""
-        stops_data = self.get_stops()
+        """Get stops data as a pandas DataFrame with cache refreshing."""
+        # Force cache refresh for stop data
+        stops_data = self.get_stops(use_cache=False)
         return pd.DataFrame(stops_data)
     
     def get_routes_df(self):

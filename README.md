@@ -23,6 +23,7 @@ Een pakket voor het analyseren, visualiseren en verkennen van NMBS (Belgische Sp
   - [De Webapplicatie Uitvoeren](#de-webapplicatie-uitvoeren)
   - [Alleen de Gegevensanalyse Uitvoeren](#alleen-de-gegevensanalyse-uitvoeren)
   - [Een Kaartvisualisatie Genereren](#een-kaartvisualisatie-genereren)
+  - [Realtime Treinroutes Visualiseren](#realtime-treinroutes-visualiseren)
 - [Gegevensbronnen](#-gegevensbronnen)
 - [Realtime Gegevenstoegang](#-realtime-gegevenstoegang)
 - [Pakketstructuur](#-pakketstructuur)
@@ -113,6 +114,26 @@ Je kunt de `--light` vlag gebruiken voor een visualisatie in lichte modus:
 python main.py visualize --light
 ```
 
+### Realtime Treinroutes Visualiseren
+
+```bash
+python main.py visualize --realtime
+```
+
+Deze optie haalt dynamisch gegevens op van de API elke 30 seconden en werkt de kaart bij met de actuele treinposities en routes. Je kunt op elke trein klikken om gedetailleerde informatie te zien, zoals:
+
+- Vertrek- en aankomststations
+- Actuele positie
+- Geplande haltes met platforms
+- Vertragingsinformatie
+- Lijn- en reisnummer
+
+Voor een realtime visualisatie in lichte modus:
+
+```bash
+python main.py visualize --realtime --light
+```
+
 ## 📊 Gegevensbronnen
 
 De applicatie werkt met de volgende gegevensbronnen:
@@ -189,6 +210,7 @@ A package for analyzing, visualizing, and exploring NMBS (Belgian Railways) trai
   - [Run the Web Application](#run-the-web-application)
   - [Run Only Data Analysis](#run-only-data-analysis)
   - [Generate a Map Visualization](#generate-a-map-visualization)
+  - [Visualize Real-time Train Routes](#visualize-real-time-train-routes)
 - [Data Sources](#-data-sources)
 - [Real-time Data Access](#-real-time-data-access)
 - [Package Structure](#-package-structure)
@@ -277,6 +299,26 @@ You can use the `--light` flag for a visualization in light mode:
 
 ```bash
 python main.py visualize --light
+```
+
+### Visualize Real-time Train Routes
+
+```bash
+python main.py visualize --realtime
+```
+
+This option dynamically fetches data from the API every 30 seconds and updates the map with current train positions and routes. You can click on any train to see detailed information such as:
+
+- Departure and arrival stations
+- Current position
+- Scheduled stops with platforms
+- Delay information
+- Line and trip number
+
+For a real-time visualization in light mode:
+
+```bash
+python main.py visualize --realtime --light
 ```
 
 ## 📊 Data Sources
