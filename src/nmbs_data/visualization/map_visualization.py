@@ -841,7 +841,438 @@ def create_realtime_train_routes_map(max_routes=20, save_path=None):
     
     return save_path
 
+def create_trajectories_map(max_trajectories=30, save_path=None, light_mode=False, pages_to_fetch=-1):
+    """
+    Create an interactive map showing train trajectories from the new API endpoint.
+    
+    Args:
+        max_trajectories (int): Maximum number of trajectories to display on the map
+                               (set to float('inf') for no limit)
+        save_path (str): Path to save the map HTML file, or None to use default
+        light_mode (bool): Whether to use light mode for the map
+        pages_to_fetch (int): Number of pages to fetch from the API, -1 for all pages
+        
+    Returns:
+        str: Path to the saved HTML map file
+    """
+    import folium
+    from folium.plugins import MarkerCluster, FeatureGroupSubGroup, TimestampedGeoJson
+    import datetime
+    import time
+    import random
+    import colorsys
+    from nmbs_data.data.api_client import get_trajectories_data
+    
+    # Load trajectories data from the API
+    trajectories_response = get_trajectories_data(max_pages=pages_to_fetch)
+    trajectories = trajectories_response.get('data', [])
+    
+    if not trajectories:
+        print("⚠️ No trajectories data found from API.")
+        return None
+    
+    # Get metadata
+    metadata = trajectories_response.get('metadata', {})
+    generated_at = metadata.get('generated_at', datetime.datetime.now().isoformat())
+    total_records = metadata.get('total_records', len(trajectories))
+    
+    print(f"✓ Loaded {len(trajectories)} trajectories from API (out of {total_records} total records)")
+    
+    # Select a subset of trajectories if needed (unless max_trajectories is infinite)
+    if len(trajectories) > max_trajectories and max_trajectories != float('inf'):
+        print(f"⚠️ Limiting display to {max_trajectories} trajectories for performance (out of {len(trajectories)} loaded)")
+        # Prioritize trajectories with more stops for better visualization
+        trajectories.sort(key=lambda t: len(t.get('stops', [])), reverse=True)
+        trajectories = trajectories[:max_trajectories]
+    elif max_trajectories == float('inf'):
+        print(f"ℹ️ Displaying all {len(trajectories)} trajectories (no limit applied)")
+    
+    # Center the map on Belgium
+    map_center = [50.85, 4.35]  # Brussels coordinates
+    
+    # Create map with appropriate style
+    if light_mode:
+        map_tiles = 'CartoDB positron'
+        map_bg = 'light'
+    else:
+        map_tiles = 'CartoDB dark_matter'
+        map_bg = 'dark'
+    
+    train_map = folium.Map(
+        location=map_center,
+        zoom_start=8,
+        tiles=map_tiles
+    )
+    
+    # Add title and timestamp
+    title_html = f'''
+        <h3 align="center" style="font-size:16px; {'color:#fff' if map_bg == 'dark' else ''}">
+            <b>Belgian Railways (NMBS/SNCB) - Train Trajectories</b>
+        </h3>
+        <h4 align="center" style="font-size:14px; {'color:#ddd' if map_bg == 'dark' else ''}">
+            Data from: {generated_at}
+            <br><span style="font-size:12px">Showing {len(trajectories)} of {total_records} trajectories | (API updates every 30 seconds)</span>
+        </h4>
+    '''
+    train_map.get_root().html.add_child(folium.Element(title_html))
+    
+    # Create feature groups for organization
+    stations_group = folium.FeatureGroup(name="All Stations")
+    train_map.add_child(stations_group)
+    
+    all_routes_group = folium.FeatureGroup(name="All Routes", show=False)
+    train_map.add_child(all_routes_group)
+    
+    active_trains_group = folium.FeatureGroup(name="Active Trains")
+    train_map.add_child(active_trains_group)
+    
+    # Dictionary to store unique stations to avoid duplicates
+    unique_stations = {}
+    
+    # Process each trajectory
+    for idx, trajectory in enumerate(trajectories):
+        # Extract basic information
+        entity_id = trajectory.get('entity_id', 'unknown')
+        trip_id = trajectory.get('trip_id', 'unknown')
+        
+        # Get route information
+        route = trajectory.get('route', {})
+        route_id = route.get('route_id', 'unknown')
+        route_type = route.get('route_type', 'IC')
+        route_name = route.get('route_name', f'Route {route_id}')
+        agency_id = route.get('agency_id', 'NMBS/SNCB')
+        
+        # Get trip details
+        trip = trajectory.get('trip', {})
+        trip_number = trip.get('trip_number', 'unknown')
+        trip_headsign = trip.get('trip_headsign', 'unknown')
+        service_id = trip.get('service_id', 'unknown')
+        
+        # Get stops
+        stops = trajectory.get('stops', [])
+        if not stops or len(stops) < 2:
+            continue
+        
+        # Generate a color for this trajectory
+        hue = (idx * 0.618033988749895) % 1.0  # Golden ratio distribution
+        if map_bg == 'dark':
+            r, g, b = colorsys.hsv_to_rgb(hue, 0.8, 1.0)
+        else:
+            r, g, b = colorsys.hsv_to_rgb(hue, 0.7, 0.8)
+        color = f'#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}'
+        
+        # Create a subgroup for this trajectory
+        route_display_name = f"{route_type} {trip_number}: {route_name}"
+        route_group = FeatureGroupSubGroup(all_routes_group, name=route_display_name)
+        train_map.add_child(route_group)
+        
+        # Prepare coordinates for polyline
+        route_coords = []
+        stop_features = []
+        
+        # Current time for comparison
+        current_time = int(time.time())
+        
+        # Find the most recent stop with departure/arrival time in the past
+        current_stop_index = -1
+        for i, stop in enumerate(stops):
+            # Check departure time if available
+            departure = stop.get('departure')
+            if departure:
+                timestamp = int(departure.get('timestamp', 0))
+                if timestamp <= current_time:
+                    current_stop_index = i
+            
+            # If no departure or it's in the future, check arrival
+            if current_stop_index != i:
+                arrival = stop.get('arrival')
+                if arrival:
+                    timestamp = int(arrival.get('timestamp', 0))
+                    if timestamp <= current_time:
+                        current_stop_index = i
+        
+        # Process each stop
+        for i, stop in enumerate(stops):
+            # Extract station information
+            station = stop.get('station', {})
+            station_name = station.get('name', f'Station {i}')
+            
+            # Get translations if available
+            translations = station.get('translations', {})
+            dutch_name = translations.get('nl', station_name)
+            english_name = translations.get('en', station_name)
+            
+            # Get location
+            location = station.get('location', {})
+            lat = float(location.get('latitude', 0))
+            lon = float(location.get('longitude', 0))
+            
+            # Skip stops without valid coordinates
+            if lat == 0 and lon == 0:
+                continue
+                
+            # Add to coordinates list for route line
+            route_coords.append([lat, lon])
+            
+            # Determine if this is the current stop
+            is_current = (i == current_stop_index)
+            
+            # Add station to unique stations dictionary if not already present
+            station_id = stop.get('stop_id', f'stop_{i}')
+            if station_id not in unique_stations:
+                station_icon = folium.Icon(
+                    icon='train-station', 
+                    prefix='fa', 
+                    color='blue'
+                )
+                
+                popup_html = f"""
+                <div style="min-width: 180px; max-width: 250px">
+                    <h4>{station_name}</h4>
+                    <b>ID:</b> {station_id}<br>
+                    {f"<b>Dutch:</b> {dutch_name}<br>" if dutch_name != station_name else ""}
+                    {f"<b>English:</b> {english_name}<br>" if english_name != station_name else ""}
+                    <b>Coordinates:</b> {lat:.4f}, {lon:.4f}
+                </div>
+                """
+                
+                # Create station marker
+                station_marker = folium.Marker(
+                    [lat, lon],
+                    popup=folium.Popup(popup_html, max_width=300),
+                    tooltip=station_name,
+                    icon=station_icon
+                )
+                unique_stations[station_id] = {
+                    'marker': station_marker,
+                    'name': station_name,
+                    'coords': (lat, lon)
+                }
+                station_marker.add_to(stations_group)
+            
+            # Determine status icon and color based on position in sequence
+            if i == 0:
+                stop_type = "Origin"
+                icon_color = "green"
+            elif i == len(stops) - 1:
+                stop_type = "Destination"
+                icon_color = "red"
+            else:
+                stop_type = "Stop"
+                icon_color = "orange" if is_current else "blue"
+            
+            # Extract timing information
+            arrival = stop.get('arrival', {})
+            departure = stop.get('departure', {})
+            
+            # Format arrival info
+            arrival_time = "N/A"
+            arrival_delay = "N/A"
+            if arrival:
+                arrival_time = arrival.get('datetime', 'N/A')
+                arrival_delay = arrival.get('status', 'on time')
+            
+            # Format departure info
+            departure_time = "N/A"
+            departure_delay = "N/A"
+            if departure:
+                departure_time = departure.get('datetime', 'N/A')
+                departure_delay = departure.get('status', 'on time')
+            
+            # Create detailed popup for this stop
+            popup_content = f"""
+            <div style="min-width: 220px; max-width: 300px">
+                <h4>{station_name} ({stop_type})</h4>
+                <b>Train:</b> {route_type} {trip_number}<br>
+                <b>Route:</b> {route_name}<br>
+                <b>Direction:</b> {trip_headsign}<br>
+                <hr>
+                <b>Stop sequence:</b> {i+1} of {len(stops)}<br>
+                <hr>
+                <b>Arrival:</b> {arrival_time}<br>
+                <b>Arrival status:</b> {arrival_delay}<br>
+                <b>Departure:</b> {departure_time}<br>
+                <b>Departure status:</b> {departure_delay}<br>
+            </div>
+            """
+            
+            # Create a stop marker for this specific route
+            stop_icon = folium.Icon(
+                icon='circle', 
+                prefix='fa', 
+                color=icon_color
+            )
+            
+            # Add a marker for this stop
+            folium.Marker(
+                [lat, lon],
+                popup=folium.Popup(popup_content, max_width=300),
+                tooltip=f"{station_name} ({stop_type})",
+                icon=stop_icon
+            ).add_to(route_group)
+        
+        # Skip routes without enough valid stops
+        if len(route_coords) < 2:
+            continue
+            
+        # Create route line
+        route_line = folium.PolyLine(
+            route_coords,
+            color=color,
+            weight=4,
+            opacity=0.8,
+            tooltip=f"{route_type} {trip_number}: {route_name}"
+        )
+        route_line.add_to(route_group)
+        
+        # Add a train icon at the current position if we know it
+        if current_stop_index >= 0 and current_stop_index < len(route_coords):
+            current_pos = route_coords[current_stop_index]
+            
+            # If we're between stops, interpolate position
+            if current_stop_index < len(route_coords) - 1:
+                next_pos = route_coords[current_stop_index + 1]
+                
+                # Get departure time from current stop
+                current_stop = stops[current_stop_index]
+                next_stop = stops[current_stop_index + 1]
+                
+                departure_time = None
+                if current_stop.get('departure'):
+                    departure_time = int(current_stop['departure'].get('timestamp', 0))
+                
+                arrival_time = None
+                if next_stop.get('arrival'):
+                    arrival_time = int(next_stop['arrival'].get('timestamp', 0))
+                
+                # Only interpolate if we have valid times
+                if departure_time and arrival_time and departure_time < current_time < arrival_time:
+                    # Calculate progress between stops (0.0 to 1.0)
+                    progress = (current_time - departure_time) / (arrival_time - departure_time)
+                    
+                    # Interpolate position
+                    lat = current_pos[0] + progress * (next_pos[0] - current_pos[0])
+                    lon = current_pos[1] + progress * (next_pos[1] - current_pos[1])
+                    
+                    current_pos = [lat, lon]
+            
+            # Get current and next stop info for popup
+            current_stop = stops[current_stop_index]
+            current_station = current_stop.get('station', {}).get('name', 'Unknown')
+            
+            next_station = "Terminus"
+            if current_stop_index < len(stops) - 1:
+                next_station = stops[current_stop_index + 1].get('station', {}).get('name', 'Unknown')
+            
+            # Get delay info for current stop
+            delay_minutes = 0
+            status = "On time"
+            
+            # Check departure delay if available
+            if current_stop.get('departure'):
+                delay_minutes = current_stop['departure'].get('delay_minutes', 0)
+                status = current_stop['departure'].get('status', 'On time')
+            # Otherwise check arrival delay
+            elif current_stop.get('arrival'):
+                delay_minutes = current_stop['arrival'].get('delay_minutes', 0)
+                status = current_stop['arrival'].get('status', 'On time')
+            
+            # Create detailed popup for the train
+            train_popup = f"""
+            <div style="min-width: 250px; max-width: 350px">
+                <h4>{route_type} {trip_number}</h4>
+                <b>Route:</b> {route_name}<br>
+                <b>Direction:</b> {trip_headsign}<br>
+                <hr>
+                <b>Current status:</b> {status}<br>
+                <b>Delay:</b> {delay_minutes} minutes<br>
+                <hr>
+                <b>Current/Last station:</b> {current_station}<br>
+                <b>Next station:</b> {next_station}<br>
+                <hr>
+                <b>Total stops:</b> {len(stops)}<br>
+                <button onclick="window.open('https://www.belgiantrain.be/en/travel-info/search-a-train?trainNumber={trip_number}', '_blank')">
+                    View on NMBS/SNCB Website
+                </button>
+            </div>
+            """
+            
+            # Choose icon color based on delay
+            icon_color = 'green'
+            if delay_minutes > 0:
+                icon_color = 'orange'
+            if delay_minutes >= 5:
+                icon_color = 'red'
+            
+            # Add train marker with custom icon
+            train_icon = folium.Icon(
+                icon='train',
+                prefix='fa',
+                color=icon_color,
+                icon_color='white'
+            )
+            
+            train_marker = folium.Marker(
+                current_pos,
+                popup=folium.Popup(train_popup, max_width=350),
+                tooltip=f"{route_type} {trip_number} to {trip_headsign}",
+                icon=train_icon
+            )
+            train_marker.add_to(active_trains_group)
+    
+    # Add layer control
+    folium.LayerControl(collapsed=False).add_to(train_map)
+    
+    # Add fullscreen button
+    folium.plugins.Fullscreen().add_to(train_map)
+    
+    # Add a legend
+    legend_html = f'''
+    <div style="position: fixed; 
+        bottom: 50px; left: 50px; width: 180px; height: 125px; 
+        border:2px solid {'white' if map_bg == 'dark' else 'black'}; 
+        z-index:9999; 
+        background-color: {'rgba(32, 32, 32, 0.8)' if map_bg == 'dark' else 'rgba(255, 255, 255, 0.8)'}; 
+        {'color: white;' if map_bg == 'dark' else ''}">
+        <div style="font-size: 14px; padding: 8px;">
+        <b>Legend</b><br>
+        <i class="fa fa-train" style="color:green;"></i> On time train<br>
+        <i class="fa fa-train" style="color:orange;"></i> Delayed train (< 5 min)<br>
+        <i class="fa fa-train" style="color:red;"></i> Delayed train (≥ 5 min)<br>
+        <i class="fa fa-circle" style="color:green;"></i> Origin station<br>
+        <i class="fa fa-circle" style="color:red;"></i> Destination station<br>
+        <i class="fa fa-circle" style="color:orange;"></i> Current stop<br>
+        </div>
+    </div>
+    '''
+    train_map.get_root().html.add_child(folium.Element(legend_html))
+    
+    # Add auto-refresh capability for real-time updates
+    refresh_html = '''
+    <script>
+        // Auto-refresh the map every 30 seconds
+        setTimeout(function() {
+            location.reload();
+        }, 30000);
+    </script>
+    '''
+    train_map.get_root().html.add_child(folium.Element(refresh_html))
+
+    # Determine save path
+    if not save_path:
+        timestamp = int(time.time())
+        maps_dir = os.path.join('reports', 'maps')
+        os.makedirs(maps_dir, exist_ok=True)
+        save_path = os.path.join(maps_dir, f'train_trajectories_{timestamp}.html')
+
+    # Save the map
+    train_map.save(save_path)
+    print(f"Trajectory map saved to: {save_path}")
+    
+    return save_path
+
 if __name__ == "__main__":
     # When run directly, generate a map using default settings
     map_path = create_realtime_train_routes_map()
     print(f"To view the map, open: {map_path}")
+

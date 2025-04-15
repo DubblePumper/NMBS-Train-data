@@ -287,6 +287,80 @@ class NMBSApiClient:
         """Get specific planning data file contents."""
         return self.get(f"planningdata/{filename}")
     
+    # Trajectories data methods
+    def get_trajectories(self, page=0, page_size=None, use_cache=False):
+        """Get the latest trajectories data.
+        
+        Args:
+            page: Page number (0-based)
+            page_size: Number of trajectories per page (None to use API default)
+            use_cache: Whether to use cached responses
+            
+        Returns:
+            dict: The trajectories data including metadata
+        """
+        params = {'page': page}
+        
+        # Only include page_size if explicitly specified
+        if page_size is not None:
+            params['page_size'] = page_size
+            
+        return self.get("trajectories", params=params, use_cache=use_cache)
+    
+    def get_all_trajectories(self, max_pages=5, page_size=None, use_cache=False):
+        """Get multiple pages of trajectory data and combine them.
+        
+        Args:
+            max_pages: Maximum number of pages to fetch (set to -1 for all pages)
+            page_size: Number of trajectories per page (None to use API default)
+            use_cache: Whether to use cached responses
+            
+        Returns:
+            list: Combined trajectory data from all fetched pages
+        """
+        all_trajectories = []
+        metadata = None
+        
+        page = 0
+        total_pages = max_pages if max_pages > 0 else float('inf')
+        
+        while page < total_pages:
+            try:
+                response = self.get_trajectories(page=page, page_size=page_size, use_cache=use_cache)
+                
+                if not response or 'data' not in response:
+                    break
+                    
+                trajectories = response.get('data', [])
+                if not trajectories:
+                    break
+                    
+                all_trajectories.extend(trajectories)
+                
+                # Store metadata from the first response
+                if metadata is None and 'metadata' in response:
+                    metadata = response['metadata']
+                    # If we're fetching all pages, update the total_pages value
+                    if max_pages == -1 and 'total_pages' in metadata:
+                        total_pages = metadata['total_pages']
+                
+                # Move to next page
+                page += 1
+                
+                # Check if we've reached the last page
+                if 'metadata' in response:
+                    if page >= response['metadata'].get('total_pages', 0):
+                        break
+                        
+            except Exception as e:
+                logger.error(f"Error fetching trajectory page {page}: {str(e)}")
+                break
+                    
+        return {
+            'metadata': metadata,
+            'data': all_trajectories
+        }
+    
     # Real-time data methods
     def get_realtime_data(self):
         """Get the latest real-time train data."""
@@ -327,6 +401,12 @@ class NMBSApiClient:
         """Get calendar dates data as a pandas DataFrame."""
         calendar_dates_data = self.get_calendar_dates()
         return pd.DataFrame(calendar_dates_data)
+    
+    def get_trajectories_df(self):
+        """Get trajectories data as a pandas DataFrame."""
+        trajectories_response = self.get_all_trajectories(max_pages=2)
+        trajectories_data = trajectories_response.get('data', [])
+        return pd.DataFrame(trajectories_data)
 
 # Create a singleton instance
 api_client = NMBSApiClient(cache_dir=os.path.join(os.path.dirname(__file__), "cache"))
@@ -341,6 +421,18 @@ def get_realtime_data():
         dict: The GTFS real-time data as a dictionary
     """
     return api_client.get_realtime_data()
+
+def get_trajectories_data(max_pages=2):
+    """
+    Get the latest NMBS train trajectories data.
+    
+    Args:
+        max_pages (int): Maximum number of pages to fetch
+    
+    Returns:
+        dict: The trajectories data as a dictionary with metadata and data
+    """
+    return api_client.get_all_trajectories(max_pages=max_pages, page_size=None)
 
 def get_planning_files_list():
     """
