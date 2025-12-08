@@ -552,7 +552,7 @@ def simulate_realtime_trains(num_trains=10) -> Dict[str, Dict[str, Any]]:
     logging.info(f"Generated {num_trains} simulated trains for testing")
     return simulated_trains
 
-def create_realtime_train_routes_map(max_routes=20, save_path=None):
+def create_realtime_train_routes_map(max_routes=20, save_path=None, dark_mode=False):
     """
     Create an interactive map showing realtime train routes.
     
@@ -589,25 +589,28 @@ def create_realtime_train_routes_map(max_routes=20, save_path=None):
     
     # Center the map on Belgium
     map_center = [50.85, 4.35]  # Brussels coordinates
+    map_tiles = 'CartoDB dark_matter' if dark_mode else 'CartoDB positron'
+    title_style = "color:#fff;" if dark_mode else ""
+    subtitle_style = "color:#ddd;" if dark_mode else ""
     
     # Create a map
     train_map = folium.Map(
         location=map_center,
         zoom_start=8,
-        tiles='CartoDB positron'
+        tiles=map_tiles
     )
     
     # Add title and timestamp
     title_html = f'''
-        <h3 align="center" style="font-size:16px">
+        <h3 align="center" style="font-size:16px; {title_style}">
             <b>Belgian Railways (NMBS/SNCB) - Real-time Train Routes</b>
         </h3>
-        <h4 align="center" style="font-size:14px">
+        <h4 align="center" style="font-size:14px; {subtitle_style}">
             Last updated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
             <br><span style="font-size:12px">(API updates every 30 seconds)</span>
         </h4>
     '''
-    train_map.get_root().html.add_child(folium.Element(title_html))
+    train_map.get_root().html.add_child(folium.Element(title_html))  # type: ignore[attr-defined]
     
     # Create a marker cluster for stations
     station_cluster = MarkerCluster(name="All Stations")
@@ -841,13 +844,13 @@ def create_realtime_train_routes_map(max_routes=20, save_path=None):
     
     return save_path
 
-def create_trajectories_map(max_trajectories=30, save_path=None, light_mode=False, pages_to_fetch=-1):
+def create_trajectories_map(max_trajectories: Optional[int] = 30, save_path=None, light_mode=False, pages_to_fetch=-1):
     """
     Create an interactive map showing train trajectories from the new API endpoint.
     
     Args:
-        max_trajectories (int): Maximum number of trajectories to display on the map
-                               (set to float('inf') for no limit)
+        max_trajectories (Optional[int]): Maximum number of trajectories to display on the map
+                          (set to None for no limit)
         save_path (str): Path to save the map HTML file, or None to use default
         light_mode (bool): Whether to use light mode for the map
         pages_to_fetch (int): Number of pages to fetch from the API, -1 for all pages
@@ -878,13 +881,13 @@ def create_trajectories_map(max_trajectories=30, save_path=None, light_mode=Fals
     
     print(f"✓ Loaded {len(trajectories)} trajectories from API (out of {total_records} total records)")
     
-    # Select a subset of trajectories if needed (unless max_trajectories is infinite)
-    if len(trajectories) > max_trajectories and max_trajectories != float('inf'):
+    # Select a subset of trajectories if needed (unless no limit is specified)
+    if max_trajectories is not None and len(trajectories) > max_trajectories:
         print(f"⚠️ Limiting display to {max_trajectories} trajectories for performance (out of {len(trajectories)} loaded)")
         # Prioritize trajectories with more stops for better visualization
         trajectories.sort(key=lambda t: len(t.get('stops', [])), reverse=True)
         trajectories = trajectories[:max_trajectories]
-    elif max_trajectories == float('inf'):
+    elif max_trajectories is None:
         print(f"ℹ️ Displaying all {len(trajectories)} trajectories (no limit applied)")
     
     # Center the map on Belgium
@@ -914,7 +917,7 @@ def create_trajectories_map(max_trajectories=30, save_path=None, light_mode=Fals
             <br><span style="font-size:12px">Showing {len(trajectories)} of {total_records} trajectories | (API updates every 30 seconds)</span>
         </h4>
     '''
-    train_map.get_root().html.add_child(folium.Element(title_html))
+    train_map.get_root().html.add_child(folium.Element(title_html))  # type: ignore[attr-defined]
     
     # Create feature groups for organization
     stations_group = folium.FeatureGroup(name="All Stations")
@@ -1224,7 +1227,7 @@ def create_trajectories_map(max_trajectories=30, save_path=None, light_mode=Fals
     folium.LayerControl(collapsed=False).add_to(train_map)
     
     # Add fullscreen button
-    folium.plugins.Fullscreen().add_to(train_map)
+    folium.plugins.Fullscreen().add_to(train_map)  # type: ignore[attr-defined]
     
     # Add a legend
     legend_html = f'''
@@ -1245,7 +1248,7 @@ def create_trajectories_map(max_trajectories=30, save_path=None, light_mode=Fals
         </div>
     </div>
     '''
-    train_map.get_root().html.add_child(folium.Element(legend_html))
+    train_map.get_root().html.add_child(folium.Element(legend_html))  # type: ignore[attr-defined]
     
     # Add auto-refresh capability for real-time updates
     refresh_html = '''
@@ -1256,7 +1259,7 @@ def create_trajectories_map(max_trajectories=30, save_path=None, light_mode=Fals
         }, 30000);
     </script>
     '''
-    train_map.get_root().html.add_child(folium.Element(refresh_html))
+    train_map.get_root().html.add_child(folium.Element(refresh_html))  # type: ignore[attr-defined]
 
     # Determine save path
     if not save_path:
@@ -1270,6 +1273,37 @@ def create_trajectories_map(max_trajectories=30, save_path=None, light_mode=Fals
     print(f"Trajectory map saved to: {save_path}")
     
     return save_path
+
+
+def visualize_train_routes(dark_mode=True, output_file=None, max_routes=20):
+    """Backward-compatible helper to create the default realtime train routes map.
+
+    Args:
+        dark_mode (bool): Whether to render the map with a dark background/tiles.
+        output_file (str | None): Optional filename or path for the generated HTML map.
+        max_routes (int): Maximum number of routes to render on the map.
+
+    Returns:
+        str: Absolute path to the generated HTML map file.
+    """
+    save_path = None
+    if output_file:
+        # Create the directories if needed and resolve relative filenames inside reports/maps
+        if os.path.isabs(output_file):
+            save_path = output_file
+            output_dir = os.path.dirname(save_path)
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
+        else:
+            maps_dir = os.path.join('reports', 'maps')
+            os.makedirs(maps_dir, exist_ok=True)
+            save_path = os.path.join(maps_dir, output_file)
+    
+    return create_realtime_train_routes_map(
+        max_routes=max_routes,
+        save_path=save_path,
+        dark_mode=dark_mode
+    )
 
 if __name__ == "__main__":
     # When run directly, generate a map using default settings

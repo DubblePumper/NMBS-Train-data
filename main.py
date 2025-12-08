@@ -34,7 +34,7 @@ def run_visualization(dark_mode=True, realtime=False, trajectories=False, all_pa
     if trajectories:
         from nmbs_data.visualization.map_visualization import create_trajectories_map
         pages_to_fetch = -1 if all_pages else 3  # Fetch all pages if requested, otherwise 3 pages
-        max_trajectories = float('inf') if no_limit else 100  # No limit if specified
+        max_trajectories = None if no_limit else 100  # No limit if specified
         output_path = create_trajectories_map(max_trajectories=max_trajectories, light_mode=not dark_mode, pages_to_fetch=pages_to_fetch)
         print(f"Trajectories map generated at: {output_path}")
     elif realtime:
@@ -42,7 +42,7 @@ def run_visualization(dark_mode=True, realtime=False, trajectories=False, all_pa
         output_path = create_realtime_train_routes_map()
         print(f"Real-time map generated at: {output_path}")
     else:
-        from nmbs_data.visualization.map_visualization import visualize_train_routes
+        from nmbs_data.visualization import visualize_train_routes
         output_path = visualize_train_routes(dark_mode=dark_mode)
         print(f"Map generated at: {output_path}")
     
