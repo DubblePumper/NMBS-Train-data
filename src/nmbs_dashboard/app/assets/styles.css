@@ -1,0 +1,150 @@
+body {
+  margin: 0;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: #0f1722;
+  color: #e6edf3;
+}
+
+.dashboard-shell {
+  padding: 20px;
+  max-width: 1500px;
+  margin: 0 auto;
+}
+
+.hero h1 {
+  margin: 0;
+  color: #8fd1ff;
+}
+
+.hero p {
+  margin-top: 6px;
+  color: #b8c4d2;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.metric-card {
+  border: 1px solid #2c3c51;
+  border-radius: 12px;
+  background: #152233;
+  padding: 12px;
+}
+
+.metric-label {
+  font-size: 12px;
+  color: #9eb0c4;
+}
+
+.metric-value {
+  font-size: 28px;
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+.metric-subtitle {
+  font-size: 12px;
+  color: #8aa0b8;
+  margin-top: 4px;
+}
+
+.control-panel {
+  margin: 14px 0;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #2c3c51;
+  background: #152233;
+}
+
+.control-panel.dual {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #9eb0c4;
+}
+
+.panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.panel {
+  margin-top: 12px;
+  border: 1px solid #2c3c51;
+  border-radius: 12px;
+  background: #152233;
+  padding: 12px;
+}
+
+.graph-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(430px, 1fr));
+  gap: 12px;
+}
+
+.graph {
+  border: 1px solid #2c3c51;
+  border-radius: 12px;
+  background: #152233;
+}
+
+.section-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #b7dffb;
+}
+
+.json-preview {
+  max-height: 600px;
+  overflow: auto;
+  background: #0c1320;
+  border: 1px solid #2c3c51;
+  border-radius: 8px;
+  padding: 10px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  color: #d9e3ee;
+}
+
+.note {
+  padding: 10px;
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+.note-ok {
+  background: #1a3f2e;
+  border: 1px solid #2a6a4b;
+}
+
+.event-list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.event-list li {
+  margin: 4px 0;
+}
+
+.dash-tab {
+  background: #1b2a3e !important;
+  border-color: #2c3c51 !important;
+  color: #d4deea !important;
+}
+
+.dash-tab--selected {
+  background: #2a4360 !important;
+  border-color: #4a6f96 !important;
+  color: #ffffff !important;
+}

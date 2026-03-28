@@ -1,160 +1,51 @@
-# GTFS Real-time Data Visualization Guide
+# GTFS Realtime Visualization (Dashboard-Only)
 
-This guide explains how to visualize GTFS (General Transit Feed Specification) real-time data, building on top of the information provided by Sean Barbeau and other transit data experts.
+Deze repository is herwerkt naar één duidelijke use-case:
 
-## Understanding GTFS Real-time Data
+- een dashboard dat snapshotdata visualiseert uit `examples/endpoint_snapshots`
 
-GTFS Real-time is a feed specification that allows public transportation agencies to provide real-time updates about their fleet to application developers. The feed is provided in Protocol Buffer format and includes:
+## Datastroom
 
-- **Trip updates** - delays, cancellations, changed routes
-- **Service alerts** - station/stop closures, important notifications
-- **Vehicle positions** - where vehicles are located in real-time
+1. `manifest.json` per snapshot wordt ingelezen
+2. Endpoint JSON payloads worden gekoppeld per snapshot
+3. Realtime + trajectories worden train-centrisch geïndexeerd
+4. Dashboard toont per trein:
+   - status en richting
+   - vertraging over tijd
+   - traject op kaart
+   - stops, skip-events en spoorwijzigingen
 
-## Using the NMBS Data Package for Visualization
+## Starten
 
-The `nmbs_data` package provides several tools for working with GTFS real-time data:
-
-### Programmatic Usage
-
-```python
-# Import the visualization module
-from nmbs_data.visualization.map_visualization import visualize_train_routes
-
-# Generate a map with dark mode enabled (default)
-map_path = visualize_train_routes(dark_mode=True)
-print(f"Map saved to: {map_path}")
-
-# Or with light mode
-map_path = visualize_train_routes(dark_mode=False)
-```
-
-### Command-line Usage
+### Lokaal
 
 ```bash
-# Generate a visualization directly from the command line
-python main.py visualize
-
-# Use light mode instead of dark mode
-python main.py visualize --light
+pip install -r requirements.txt
+python main.py
 ```
 
-### Web Application
-
-You can also use the integrated web application to visualize the data:
+### Docker Compose
 
 ```bash
-python main.py webapp
+docker compose up --build
 ```
 
-Then navigate to the Maps tab in the application.
+## Snapshotbron wijzigen
 
-## Visualizing GTFS Real-time Data (External Tools)
+Standaard gebruikt de app:
 
-### Option 1: Using Existing Tools
+- `examples/endpoint_snapshots`
 
-Several ready-made tools can help you visualize GTFS real-time data:
+Override via environment variable:
 
-1. **OpenTripPlanner** - An open-source platform for multi-modal trip planning
-   - http://www.opentripplanner.org/
+- `SNAPSHOT_ROOT=/pad/naar/endpoint_snapshots`
 
-2. **OneBusAway** - A suite of transit tools focused on real-time arrival information
-   - https://github.com/OneBusAway/onebusaway-application-modules
+## Architectuur
 
-3. **OneBusAway GTFS-realtime Visualizer** - A lightweight tool specifically for visualizing vehicle positions
-   - https://github.com/OneBusAway/onebusaway-gtfs-realtime-visualizer
+Code is georganiseerd in subfolders:
 
-4. **TransitVis** - Visualizes GTFS schedules and real-time data
-   - https://github.com/mobilitydata/transitvis
-
-### Option 2: Building Your Own Visualizer
-
-If you're building your own visualizer:
-
-1. Set up a basic web server (Node.js, Python Flask, or similar)
-2. Use the GTFS-realtime bindings to parse the data
-   - https://github.com/MobilityData/gtfs-realtime-bindings
-3. Store the parsed data in a format suitable for visualization
-4. Use a mapping library like Leaflet or Mapbox to display the data
-5. Set up a polling mechanism to fetch updates every 30 seconds
-
-#### Sample Code Structure:
-
-```python
-# Using Python with Flask and GTFS-realtime-bindings
-from flask import Flask, render_template
-from google.transit import gtfs_realtime_pb2
-import requests
-import json
-
-app = Flask(__name__)
-
-@app.route('/')
-def index():
-    return render_template('map.html')
-
-@app.route('/api/vehicle-positions')
-def get_vehicle_positions():
-    # Fetch GTFS-realtime feed
-    feed = gtfs_realtime_pb2.FeedMessage()
-    response = requests.get('URL_TO_VEHICLE_POSITIONS_FEED')
-    feed.ParseFromString(response.content)
-    
-    # Process and format data for front-end
-    vehicles = []
-    for entity in feed.entity:
-        if entity.HasField('vehicle'):
-            vehicle = {
-                'id': entity.vehicle.vehicle.id,
-                'lat': entity.vehicle.position.latitude,
-                'lon': entity.vehicle.position.longitude,
-                'bearing': entity.vehicle.position.bearing,
-                'speed': entity.vehicle.position.speed,
-                'trip_id': entity.vehicle.trip.trip_id if entity.vehicle.HasField('trip') else None
-            }
-            vehicles.append(vehicle)
-    
-    return json.dumps(vehicles)
-
-if __name__ == '__main__':
-    app.run(debug=True)
-```
-
-## Implementation for NMBS/SNCB Data
-
-For Belgian Railways (NMBS/SNCB) data:
-
-1. The GTFS static data is updated daily
-2. Real-time data is updated every 30 seconds
-3. Real-time information is available for 6 hours
-
-When implementing a visualizer:
-
-1. Use the static GTFS data to build your base transit network
-2. Overlay real-time updates to show actual train positions, delays, and platform changes
-3. Poll for new data every 30 seconds to keep information current
-4. Consider implementing a caching mechanism to reduce load on the NMBS/SNCB API
-
-## Project-Specific Implementation
-
-In the NMBS Train Data project:
-
-- `nmbs_data.data.gtfs_realtime_reader` provides functions for parsing GTFS-RT data
-- `nmbs_data.visualization.map_visualization` creates interactive maps using Folium
-- Vehicle positions are displayed with directional markers
-- Platform changes are highlighted in red
-- The map includes layer controls to toggle different route types and real-time data
-
-## Useful Resources
-
-- [GTFS Realtime Reference](https://gtfs.org/realtime/)
-- [GTFS Best Practices](https://gtfs.org/best-practices/)
-- [Awesome Transit](https://github.com/CUTR-at-USF/awesome-transit) - A collection of transit tools and resources
-- [What's new in GTFS Realtime v2.0](https://barbeau.medium.com/whats-new-in-gtfs-realtime-v2-0-cd45e6a861e9)
-
-## Visualization Tips
-
-- Use different colors to distinguish between on-time and delayed vehicles
-- Provide visual indicators for platform changes
-- Allow users to filter by route or service type
-- Include a time slider to see how transit patterns change throughout the day
-- Consider adding alerts or notifications for significant delays
+- `src/nmbs_dashboard/app/services` → data inlezen/indexeren
+- `src/nmbs_dashboard/app/layout` → componenten + pagina-opbouw
+- `src/nmbs_dashboard/app/callbacks` → tab-specifieke interactie
+- `src/nmbs_dashboard/app/assets` → styling
+- `main.py` → **enige startup entrypoint**

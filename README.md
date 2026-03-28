@@ -1,373 +1,87 @@
-# NMBS Treingegevens Analyse | Vibe Coding
+# NMBS Export Dashboard
 
-<div align="center">
+Dashboard-only project for exploring NMBS API snapshot exports.
 
-![NMBS/SNCB Logo](https://img.shields.io/badge/NMBS%2FSNCB-Analysis-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/version-0.1.0-brightgreen?style=for-the-badge)
-![License](https://img.shields.io/badge/license-MIT-yellow?style=for-the-badge)
+## What this project is now
 
-</div>
+This repository was fully reworked to focus on **one thing only**:
 
-*[English version below](#nmbs-train-data-analysis--vibe-coding-1)*
+- a train-centric dashboard over snapshot data in `examples/endpoint_snapshots`
 
-Een pakket voor het analyseren, visualiseren en verkennen van NMBS (Belgische Spoorwegen) treingegevens, inclusief dienstregelingen en realtime updates.
+Removed from the project:
 
-> 🔗 Dit project maakt gebruik van onze dedicated API: [NMBS-Train-data-API](https://github.com/DubblePumper/NMBS-Train-data-API)
+- legacy analysis scripts
+- API fetch/services code
+- map generators and unrelated reports
+- extra startup flows
 
-## 📋 Inhoudsopgave
-- [Kenmerken](#-kenmerken)
-- [Projectstructuur](#-projectstructuur)
-- [Installatie](#-installatie)
-- [Gebruik](#-gebruik)
-  - [Alles Uitvoeren](#alles-uitvoeren-analyse-visualisatie-en-web-app)
-  - [De Webapplicatie Uitvoeren](#de-webapplicatie-uitvoeren)
-  - [Alleen de Gegevensanalyse Uitvoeren](#alleen-de-gegevensanalyse-uitvoeren)
-  - [Een Kaartvisualisatie Genereren](#een-kaartvisualisatie-genereren)
-  - [Realtime Treinroutes Visualiseren](#realtime-treinroutes-visualiseren)
-- [Gegevensbronnen](#-gegevensbronnen)
-- [Realtime Gegevenstoegang](#-realtime-gegevenstoegang)
-- [Pakketstructuur](#-pakketstructuur)
-- [API Endpoints](#-api-endpoints)
-- [Licentie](#-licentie)
+## Project structure
 
-## ✨ Kenmerken
-
-- Analyseert NMBS treingegevens om patronen en trends te ontdekken
-- Visualiseert treinroutes op interactieve kaarten
-- Verwerkt zowel statische planningsgegevens als realtime updates
-- Biedt een interactieve webapplicatie voor gegevensverkenning
-- Ondersteunt lichte en donkere modus voor visualisaties
-- Automatische gegevensverwerking en analyse
-- Integreert met onze realtime NMBS API voor up-to-date informatie
-
-## 📂 Projectstructuur
-
-Het project is gestructureerd als een volwaardig Python-pakket:
-
-```
-nmbs-train-data/
-│
-├── requirements.txt        # Projectafhankelijkheden
-├── setup.py                # Pakketconfiguratie
-├── main.py                 # Hoofdingangspunt
-│
-├── src/                    # Broncodepakket
-│   └── nmbs_data/          # Hoofdpakket
-│       ├── data/           # Gegevenstoegangslaag
-│       ├── analysis/       # Analysecomponenten
-│       ├── visualization/  # Visualisatiecomponenten
-│       └── webapp/         # Webapplicatie
-│
-├── docs/                   # Documentatie
-│
-└── tests/                  # Testsuites
+```text
+NMBS-Train-data/
+├── main.py                          # single startup file
+├── docker-compose.yml               # easy local run
+├── Dockerfile                       # Python 3.14.3 runtime
+├── requirements.txt
+├── docs/
+│   └── GTFS_Realtime_Visualization.md
+├── examples/
+│   └── endpoint_snapshots/
+└── src/
+    └── nmbs_dashboard/
+        ├── wsgi.py                    # Gunicorn WSGI entrypoint
+        ├── app/
+        │   ├── assets/
+        │   ├── callbacks/
+        │   ├── layout/
+        │   ├── services/
+        │   └── server.py
+        └── paths.py
 ```
 
-## 🚀 Installatie
-
-1. Kloon de repository:
-```bash
-git clone https://github.com/yourusername/NMBS-Train-data.git
-cd NMBS-Train-data
-```
-
-2. Installeer het pakket en de afhankelijkheden:
-```bash
-pip install -e .
-```
-
-## 🔧 Gebruik
-
-### Alles Uitvoeren (Analyse, Visualisatie en Web App)
+## Run locally (no Docker)
 
 ```bash
-python main.py all
+pip install -r requirements.txt
+python main.py
 ```
 
-Je kunt ook de `--light` vlag gebruiken voor een visualisatie in lichte modus:
+Open: `http://localhost:8050`
+
+Optional flags:
 
 ```bash
-python main.py all --light
+python main.py --host 0.0.0.0 --port 8050 --debug
 ```
 
-### De Webapplicatie Uitvoeren
+## Run with Docker Compose (recommended)
 
 ```bash
-python main.py webapp
+docker compose up --build
 ```
 
-### Alleen de Gegevensanalyse Uitvoeren
+Open: `http://localhost:8050`
+
+Container runtime details:
+
+- Python image: `3.14.3-slim`
+- Process manager: `gunicorn` (2 workers, gthread worker class)
+- Runs as a non-root user (`app`)
+- Healthcheck probes `http://127.0.0.1:8050`
+
+Stop:
 
 ```bash
-python main.py analyze
+docker compose down
 ```
 
-### Een Kaartvisualisatie Genereren
+## Notes
+
+- Default snapshot source is `examples/endpoint_snapshots`.
+- You can override snapshot source with environment variable `SNAPSHOT_ROOT`.
+
+## Tests
 
 ```bash
-python main.py visualize
+pytest
 ```
-
-Je kunt de `--light` vlag gebruiken voor een visualisatie in lichte modus:
-
-```bash
-python main.py visualize --light
-```
-
-### Realtime Treinroutes Visualiseren
-
-```bash
-python main.py visualize --realtime
-```
-
-Deze optie haalt dynamisch gegevens op van de API elke 30 seconden en werkt de kaart bij met de actuele treinposities en routes. Je kunt op elke trein klikken om gedetailleerde informatie te zien, zoals:
-
-- Vertrek- en aankomststations
-- Actuele positie
-- Geplande haltes met platforms
-- Vertragingsinformatie
-- Lijn- en reisnummer
-
-Voor een realtime visualisatie in lichte modus:
-
-```bash
-python main.py visualize --realtime --light
-```
-
-## 📊 Gegevensbronnen
-
-De applicatie werkt met de volgende gegevensbronnen:
-
-1. **Planningsgegevens**: GTFS, NeTEx en andere dienstregeling-formaten van NMBS/SNCB
-2. **Realtime gegevens**: GTFS-RT formaat gegevens via onze API-endpoint
-
-## 🔄 Realtime Gegevenstoegang
-
-Deze applicatie maakt verbinding met onze speciale API-endpoint op `https://nmbsapi.sanderzijntestjes.be/api/` om de nieuwste NMBS-treingegevens op te halen. De API-service draait onafhankelijk en levert realtime GTFS-gegevens, die deze applicatie vervolgens verwerkt, analyseert en visualiseert.
-
-### Gegevensformaat
-
-De API levert gegevens in het standaard GTFS Realtime-formaat, met informatie over:
-- Ritwijzigingen
-- Dienstregeling-wijzigingen
-- Perroninformatie
-- Vertragingsinformatie
-
-## 🧩 Pakketstructuur
-
-- **data**: Verzorgt gegevenstoegang via de API-endpoint en beheert bestandspaden
-- **analysis**: Bevat gegevensverwerking en analyselogica
-- **visualization**: Beheert kaartcreatie en visualisaties
-- **webapp**: Bevat de Dash webapplicatiecomponenten
-
-## 🌐 API Endpoints
-
-De applicatie maakt gebruik van de volgende API endpoints:
-
-- `/api/health`: Controleert de status van de API
-- `/api/realtime/data`: Haalt de nieuwste realtime treingegevens op
-- `/api/planningdata/stops`: Haalt stationsinformatie op
-- `/api/planningdata/routes`: Haalt route-informatie op
-- `/api/planningdata/trips`: Haalt ritinformatie op
-- En meer...
-
-Voor meer informatie over de API, zie: [https://github.com/DubblePumper/NMBS-Train-data-API](https://github.com/DubblePumper/NMBS-Train-data-API)
-
-## 🧪 Ontwikkeling
-
-### Tests Uitvoeren
-
-```bash
-pytest tests/
-```
-
-## 📜 Licentie
-
-Dit project is gelicenseerd onder de MIT-licentie - zie het LICENSE-bestand voor details.
-
----
-
-# NMBS Train Data Analysis | Vibe Coding
-
-<div align="center">
-
-![NMBS/SNCB Logo](https://img.shields.io/badge/NMBS%2FSNCB-Analysis-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/version-0.1.0-brightgreen?style=for-the-badge)
-![License](https://img.shields.io/badge/license-MIT-yellow?style=for-the-badge)
-
-</div>
-
-A package for analyzing, visualizing, and exploring NMBS (Belgian Railways) train data, including schedules and real-time updates.
-
-> 🔗 This project uses our dedicated API: [NMBS-Train-data-API](https://github.com/DubblePumper/NMBS-Train-data-API)
-
-## 📋 Table of Contents
-- [Features](#-features-1)
-- [Project Structure](#-project-structure)
-- [Installation](#-installation-1)
-- [Usage](#-usage-1)
-  - [Run Everything](#run-everything-analysis-visualization-and-web-app)
-  - [Run the Web Application](#run-the-web-application)
-  - [Run Only Data Analysis](#run-only-data-analysis)
-  - [Generate a Map Visualization](#generate-a-map-visualization)
-  - [Visualize Real-time Train Routes](#visualize-real-time-train-routes)
-- [Data Sources](#-data-sources)
-- [Real-time Data Access](#-real-time-data-access)
-- [Package Structure](#-package-structure)
-- [API Endpoints](#-api-endpoints-1)
-- [License](#-license)
-
-## ✨ Features
-
-- Analyzes NMBS train data to discover patterns and trends
-- Visualizes train routes on interactive maps
-- Processes both static planning data and real-time updates
-- Provides an interactive web application for data exploration
-- Supports light and dark mode for visualizations
-- Automatic data processing and analysis
-- Integrates with our real-time NMBS API for up-to-date information
-
-## 📂 Project Structure
-
-The project is structured as a full-fledged Python package:
-
-```
-nmbs-train-data/
-│
-├── requirements.txt        # Project dependencies
-├── setup.py                # Package configuration
-├── main.py                 # Main entry point
-│
-├── src/                    # Source code package
-│   └── nmbs_data/          # Main package
-│       ├── data/           # Data access layer
-│       ├── analysis/       # Analysis components
-│       ├── visualization/  # Visualization components
-│       └── webapp/         # Web application
-│
-├── docs/                   # Documentation
-│
-└── tests/                  # Test suites
-```
-
-## 🚀 Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/NMBS-Train-data.git
-cd NMBS-Train-data
-```
-
-2. Install the package and dependencies:
-```bash
-pip install -e .
-```
-
-## 🔧 Usage
-
-### Run Everything (Analysis, Visualization and Web App)
-
-```bash
-python main.py all
-```
-
-You can also use the `--light` flag for a visualization in light mode:
-
-```bash
-python main.py all --light
-```
-
-### Run the Web Application
-
-```bash
-python main.py webapp
-```
-
-### Run Only Data Analysis
-
-```bash
-python main.py analyze
-```
-
-### Generate a Map Visualization
-
-```bash
-python main.py visualize
-```
-
-You can use the `--light` flag for a visualization in light mode:
-
-```bash
-python main.py visualize --light
-```
-
-### Visualize Real-time Train Routes
-
-```bash
-python main.py visualize --realtime
-```
-
-This option dynamically fetches data from the API every 30 seconds and updates the map with current train positions and routes. You can click on any train to see detailed information such as:
-
-- Departure and arrival stations
-- Current position
-- Scheduled stops with platforms
-- Delay information
-- Line and trip number
-
-For a real-time visualization in light mode:
-
-```bash
-python main.py visualize --realtime --light
-```
-
-## 📊 Data Sources
-
-The application works with the following data sources:
-
-1. **Planning data**: GTFS, NeTEx and other schedule formats from NMBS/SNCB
-2. **Real-time data**: GTFS-RT format data via our API endpoint
-
-## 🔄 Real-time Data Access
-
-This application connects to our dedicated API endpoint at `https://nmbsapi.sanderzijntestjes.be/api/` to fetch the latest NMBS train data. The API service runs independently and provides real-time GTFS data, which this application then processes, analyzes, and visualizes.
-
-### Data Format
-
-The API provides data in the standard GTFS Realtime format, with information about:
-- Trip changes
-- Schedule changes
-- Platform information
-- Delay information
-
-## 🧩 Package Structure
-
-- **data**: Handles data access via the API endpoint and manages file paths
-- **analysis**: Contains data processing and analysis logic
-- **visualization**: Manages map creation and visualizations
-- **webapp**: Contains the Dash web application components
-
-## 🌐 API Endpoints
-
-The application uses the following API endpoints:
-
-- `/api/health`: Checks the status of the API
-- `/api/realtime/data`: Retrieves the latest real-time train data
-- `/api/planningdata/stops`: Retrieves station information
-- `/api/planningdata/routes`: Retrieves route information
-- `/api/planningdata/trips`: Retrieves trip information
-- And more...
-
-For more information about the API, see: [https://github.com/DubblePumper/NMBS-Train-data-API](https://github.com/DubblePumper/NMBS-Train-data-API)
-
-## 🧪 Development
-
-### Running Tests
-
-```bash
-pytest tests/
-```
-
-## 📜 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
